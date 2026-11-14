@@ -8,6 +8,7 @@ import type { Db, Tx } from "../db/types";
 import { evaluateRules } from "../rules";
 import { dailyOutflow, loadRuleContext } from "./context";
 import { settleOne } from "./executor";
+import { actionTitle } from "./titles";
 
 export type ActionRow = {
   id: string;
@@ -80,17 +81,6 @@ function destinationFor(p: ActionProposal, context: RuleContext): string {
   return context.contacts.find((contact) => contact.id === id)?.name ?? id;
 }
 
-function titleFor(p: ActionProposal | null, amount: number | null, destination: string | null): string {
-  if (!p || amount === null) return "Invalid action";
-  let verb = "Send";
-  if (p.type === "transfer") verb = "Move";
-  if (p.type === "bill_payment") verb = "Pay";
-  if (p.type === "trade") verb = p.side === "buy" ? "Buy" : "Sell";
-  const money = (amount / 100).toLocaleString("en-CA", {
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
-  });
-  return `${verb} $${money}${destination ? ` to ${destination}` : ""}`;
-}
 
 function balanceAfter(
   p: ActionProposal | null, amount: number | null, balance: number | undefined, status: ActionStatus,
@@ -112,7 +102,7 @@ export async function toActionCard(db: Tx, sessionId: string, action: ActionRow)
   if (p) amount = p.type === "trade" ? p.quantity * p.price_cents : p.amount_cents;
   return {
     action_id: action.id, type: action.type, status: action.status,
-    title: titleFor(p, amount, to), amount_cents: amount,
+    title: actionTitle(p, action.status, to), amount_cents: amount,
     from_label: from?.name ?? null, to_label: to,
     balance_after_cents: balanceAfter(p, amount, from?.balance_cents, action.status),
     checks: action.checks, requires_second_confirmation: action.requires_second_confirmation,

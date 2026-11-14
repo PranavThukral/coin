@@ -23,7 +23,7 @@
  */
 import { z } from "zod";
 
-export const CONTRACTS_VERSION = "1.3.0"; // 1.1: live dates, card = bill payment, daily outflow. 1.2: confirmed email, message variants. 1.3: bills may be $0
+export const CONTRACTS_VERSION = "1.4.0"; // 1.1: live dates, card = bill payment, daily outflow. 1.2: confirmed email, message variants. 1.3: bills may be $0. 1.4: overview text never repeats its amount
 
 /* ========================================================================== */
 /* 1. CONVENTIONS                                                             */
@@ -423,10 +423,10 @@ export const PLANTED_SUBSCRIPTION = {
 export const SINCE_LAST_VISIT = {
   last_visit_offset_days: -14,
   items: [
-    { kind: "dividend", title: "Dividend received", detail: "USEQ.CX paid $186.30 into your RRSP on {d-3}.", amount_cents: 18_630, ref: "txn_planted_dividend" },
-    { kind: "large_purchase", title: "Large purchase", detail: "$1,289.00 at Lakeshore Furniture Co. on your credit card, {d-5}.", amount_cents: -128_900, ref: "txn_planted_furniture" },
-    { kind: "bill_due", title: "Bill due soon", detail: "Lakeside Hydro, $142.18, due {d+3}.", amount_cents: -14_218, ref: "bill_hydro" },
-    { kind: "card_due", title: "Card statement", detail: "$4,912.38 due {d+9}. Paying it and rent on {d+16} would take chequing below $500 before your {d+19} pay.", amount_cents: -491_238, ref: "bill_card" },
+    { kind: "dividend", title: "Dividend received", detail: "From USEQ.CX into your RRSP, {d-3}.", amount_cents: 18_630, ref: "txn_planted_dividend" },
+    { kind: "large_purchase", title: "Large purchase", detail: "Lakeshore Furniture Co. on your credit card, {d-5}.", amount_cents: -128_900, ref: "txn_planted_furniture" },
+    { kind: "bill_due", title: "Bill due soon", detail: "Lakeside Hydro, due {d+3}.", amount_cents: -14_218, ref: "bill_hydro" },
+    { kind: "card_due", title: "Card statement", detail: "Due {d+9}. Paying it and rent on {d+16} would take chequing below $500 before your {d+19} pay.", amount_cents: -491_238, ref: "bill_card" },
   ],
 } as const;
 

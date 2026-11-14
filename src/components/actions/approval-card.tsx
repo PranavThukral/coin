@@ -44,7 +44,7 @@ const STATUS: Record<CardState, { tone: string; icon: React.ReactNode; text: str
   proposed: { tone: "text-muted", icon: null, text: "Ready for your approval" },
   confirm: { tone: "text-warning", icon: <AlertIcon />, text: "New recipient: confirm first" },
   blocked: { tone: "text-blocked", icon: <CrossIcon />, text: "Blocked by a check" },
-  pending_undo: { tone: "text-pending", icon: <ClockIcon />, text: "Approved. Sending in 60 seconds" },
+  pending_undo: { tone: "text-pending", icon: <ClockIcon />, text: "Approved. You can still undo" },
   executed: { tone: "text-gain", icon: null, text: "Done" },
   cancelled: { tone: "text-loss", icon: <UndoIcon />, text: "Cancelled" },
 };
@@ -70,8 +70,11 @@ function ExecutedBadge() {
   );
 }
 
+/** "... I can do up to $X." / "Up to $X.": dropped when the card offers that amount as a button. */
+const OFFER_SENTENCE = /\s*(I can do up|Up) to \$[\d,]+(\.\d{2})?\.?\s*$/;
+
 /** Only what broke or needs attention. When nothing did, one quiet line. */
-function CheckList({ checks }: { checks: CheckResult[] }) {
+function CheckList({ checks, offersAmount }: { checks: CheckResult[]; offersAmount: boolean }) {
   const problems = checks.filter((c) => c.outcome === "fail" || c.outcome === "flag");
 
   if (problems.length === 0) {
@@ -91,7 +94,7 @@ function CheckList({ checks }: { checks: CheckResult[] }) {
           className={`flex items-start gap-2 font-semibold ${check.outcome === "fail" ? "text-blocked" : "text-warning"}`}
         >
           <span className="mt-0.5">{check.outcome === "fail" ? <CrossIcon /> : <AlertIcon />}</span>
-          <span>{check.message}</span>
+          <span>{offersAmount && check.outcome === "fail" ? check.message?.replace(OFFER_SENTENCE, "") : check.message}</span>
         </p>
       ))}
     </div>
@@ -218,7 +221,9 @@ export function ApprovalCard({
       <Outcome card={card} state={state} />
 
       {state === "confirm" && <RecipientConfirmation name={recipientName} onEmail={setEmail} />}
-      {showChecks && <CheckList checks={card.checks} />}
+      {showChecks && (
+        <CheckList checks={card.checks} offersAmount={state === "blocked" && card.max_passing_amount_cents !== null} />
+      )}
       {error && <p className="mt-3 text-sm font-bold text-loss">{error}</p>}
 
       <div className="mt-5 flex flex-wrap gap-2 empty:hidden">

@@ -6,8 +6,10 @@ const WINDOW_SECONDS = 60;
 const RADIUS = 24;
 const RING_LENGTH = 2 * Math.PI * RADIUS;
 
+/** Clamped to the window, so a skewed client clock can never show more than 60s. */
 function secondsUntil(executeAt: number, now: number): number {
-  return Math.max(0, Math.ceil((executeAt - now) / 1000));
+  const seconds = Math.ceil((executeAt - now) / 1000);
+  return Math.min(WINDOW_SECONDS, Math.max(0, seconds));
 }
 
 /**

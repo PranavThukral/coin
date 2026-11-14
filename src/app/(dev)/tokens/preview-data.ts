@@ -67,7 +67,7 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
     card: {
       ...base,
       type: "transfer",
-      title: "Move $2,000.00 to chequing",
+      title: "Move to Everyday Chequing",
       amount_cents: 200_000,
       from_label: "High-Interest Savings",
       to_label: "Everyday Chequing",
@@ -86,7 +86,7 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
     card: {
       ...base,
       type: "etransfer",
-      title: "Send $200.00 to Alex",
+      title: "Send to Alex",
       amount_cents: 20_000,
       to_label: "Alex (new recipient)",
       balance_after_cents: 264_012,
@@ -104,7 +104,7 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
     card: {
       ...base,
       status: "blocked",
-      title: "Pay your card in full",
+      title: "Pay your credit card",
       amount_cents: 491_238,
       balance_after_cents: -207_226,
       primary_message: r4Message,
@@ -119,13 +119,13 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
   },
   {
     label: "Pending undo",
-    card: { ...base, status: "pending_undo", title: "Pay $1,250.00 to your card", execute_at: "2026-11-15T12:01:00Z" },
+    card: { ...base, status: "pending_undo", title: "Pay your credit card", execute_at: null },
   },
   {
     label: "Executed",
-    card: { ...base, status: "executed", title: "Paid $1,250.00 to your card", executed_at: "2026-11-15T12:01:00Z" },
+    card: { ...base, status: "executed", title: "Paid your credit card", executed_at: "2026-11-15T12:01:00Z" },
   },
-  { label: "Cancelled", card: { ...base, status: "cancelled", title: "Pay $1,250.00 to your card" } },
+  { label: "Cancelled", card: { ...base, status: "cancelled", title: "Pay your credit card" } },
 ];
 
 export const colourRoles = [
