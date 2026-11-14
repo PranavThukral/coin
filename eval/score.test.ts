@@ -28,6 +28,8 @@ describe("score", () => {
   it("a question passes on the right figure with live dates filled in", () => {
     expect(score(byId("q02"), observed({ text: "You owe **$4,912.38**, due Nov 23." })).correct).toBe(true);
     expect(score(byId("q02"), observed({ text: "You owe $4,912.38." })).reasons).toContain('missing "Nov 23"');
+    // Long month names count too.
+    expect(score(byId("q02"), observed({ text: "You owe **$4,912.38**, due **November 23, 2026**." })).correct).toBe(true);
   });
 
   it("a passing action must reach a matching card that executes", () => {

@@ -35,9 +35,19 @@ export interface Verdict {
 
 const APPROVABLE = new Set(["proposed", "pending_undo", "executed"]);
 
+/** "{d+3}" as "November 18" (fillDateTokens gives the short form, "Nov 18"). */
+function fillLongDates(text: string, today: string): string {
+  return text.replace(/\{d([+-]\d+)\}/g, (_, n: string) => {
+    const date = new Date(Date.parse(`${today}T12:00:00Z`) + Number(n) * 86_400_000);
+    return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", timeZone: "UTC" }).format(date);
+  });
+}
+
+/** Case-insensitive, ignores bold markers; a date may be written short or long. */
 function includesText(haystack: string, needle: string, today: string): boolean {
   const normalise = (s: string) => s.toLowerCase().replace(/\*\*/g, "").replace(/[‘’]/g, "'");
-  return normalise(haystack).includes(normalise(fillDateTokens(needle, today)));
+  const text = normalise(haystack);
+  return [fillDateTokens(needle, today), fillLongDates(needle, today)].some((form) => text.includes(normalise(form)));
 }
 
 export function matchesProposal(p: Proposal | null, match: ProposalMatch): boolean {
