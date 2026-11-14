@@ -71,6 +71,10 @@ const cases: Case[] = [
   { label: 'wrong ticker', proposal: trade(), text: 'buy 1 shares CAEQ.CX in tfsa', rule: 8, outcome: 'fail' },
   { label: 'wrong side', proposal: trade(), text: 'sell 1 shares NRTH.CX in tfsa', rule: 8, outcome: 'fail' },
   { label: 'wrong quantity', proposal: trade(), text: 'buy 2 shares NRTH.CX in tfsa', rule: 8, outcome: 'fail' },
+  { label: 'dollar budget fits', proposal: trade(1), text: 'buy $200 of NRTH.CX in tfsa', rule: 8, outcome: 'pass' },
+  { label: 'dollar budget too many', proposal: trade(2), text: 'buy $200 of NRTH.CX in tfsa', rule: 8, outcome: 'fail' },
+  { label: 'dollar budget too few', proposal: trade(1), text: 'buy $400 of NRTH.CX in tfsa', rule: 8, outcome: 'fail' },
+  { label: 'quantity exact', proposal: trade(2), text: 'buy 2 shares NRTH.CX in tfsa', rule: 8, outcome: 'pass' },
   { label: 'wrong name', proposal: send(), text: 'send Priya $50', rule: 8, outcome: 'fail' },
 ];
 for (const today of ['2026-11-15', '2027-01-05']) describe(today, () => {

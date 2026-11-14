@@ -1,167 +1,389 @@
-import { ACCOUNT_ALIASES, ActionType, CARD_BILL_ID, INVESTMENT_ACCOUNT_TYPES, PAYMENT_SOURCE_TYPES, RULE_MESSAGES, RULE_MESSAGE_VARIANTS, TRANSFER_MATRIX, type CheckOutcome, type CheckResult, type EvaluateRules, type Proposal, type RuleContext, type RuleId } from '../../contracts';
-import { extractRequestEntities } from './extract';
-type Result = CheckResult & {
-    amountFailure?: boolean;
+import {
+  ACCOUNT_ALIASES, ActionType, CARD_BILL_ID, INVESTMENT_ACCOUNT_TYPES, PAYMENT_SOURCE_TYPES,
+  RULE_MESSAGES, RULE_MESSAGE_VARIANTS, TRANSFER_MATRIX,
+  type CheckOutcome, type CheckResult, type EvaluateRules, type Proposal, type RuleContext, type RuleId,
+} from "../../contracts";
+import { extractRequestEntities } from "./extract";
+
+type Result = CheckResult & { amountFailure?: boolean };
+type Options = {
+  values?: Record<string, string>;
+  amount?: number | null;
+  quantity?: number | null;
+  amountFailure?: boolean;
+  variant?: string;
 };
-const result = (rule: RuleId, outcome: CheckOutcome, substitutions: Record<string, string> = {}, amount: number | null = null, quantity: number | null = null, amountFailure = false, variant?: string): Result => {
-    let message = variant ?? RULE_MESSAGES[rule];
-    for (const [key, value] of Object.entries(substitutions))
-        message = message.replace(`[${key}]`, value);
-    return { rule, outcome, message: outcome === 'fail' || outcome === 'flag' ? message : null, max_passing_amount_cents: amount !== null && amount > 0 ? amount : null, max_passing_quantity: quantity, amountFailure };
-};
-const money = (n: number) => (Math.max(0, n) / 100).toFixed(2);
-const word = (text: string, value: string) => value.length > 0 && new RegExp(`(?<![\\w])${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w])`, 'i').test(text);
-const account = (ctx: RuleContext, id: string) => ctx.accounts.find(a => a.id === id);
-const recipientName = (p: Extract<Proposal, {
-    type: 'etransfer';
-}>, ctx: RuleContext) => p.recipient.kind === 'new' ? p.recipient.name : ctx.contacts.find(c => c.id === (p.recipient.kind === 'saved' ? p.recipient.contact_id : ''))?.name.split(/\s|\(/)[0] ?? '';
-const billNamed = (p: Extract<Proposal, {
-    type: 'bill_payment';
-}>, ctx: RuleContext) => {
-    const text = ctx.user_message.text;
-    if (p.bill_id === CARD_BILL_ID)
-        return ACCOUNT_ALIASES.acc_card.some(a => word(text, a));
-    const bill = ctx.bills.find(b => b.id === p.bill_id);
-    if (!bill)
-        return false;
-    const terms = [bill.id.replace(/^bill_/, '').replace(/_/g, ' '), ...bill.payee.split(/[^a-z]+/i).filter(s => s.length > 3)];
-    return terms.some(term => word(text, term));
-};
-const fullValue = (p: Proposal, ctx: RuleContext) => p.type === 'bill_payment' ? p.bill_id === CARD_BILL_ID ? account(ctx, 'acc_card')?.statement_balance_cents : ctx.bills.find(b => b.id === p.bill_id)?.amount_cents : undefined;
-const nameMatches = (text: string, name: string) => {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    return parts.length > 0 && parts.every(part => word(text, part));
-};
+type Trade = Extract<Proposal, { type: "trade" }>;
+type Payment = Extract<Proposal, { type: "bill_payment" }>;
+type Transfer = Extract<Proposal, { type: "transfer" }>;
+type Etransfer = Extract<Proposal, { type: "etransfer" }>;
+
+function fillMessage(rule: RuleId, options: Options): string {
+  let message = options.variant ?? RULE_MESSAGES[rule];
+  for (const [key, value] of Object.entries(options.values ?? {})) {
+    message = message.replace("[" + key + "]", value);
+  }
+  return message;
+}
+
+function makeResult(rule: RuleId, outcome: CheckOutcome, options: Options = {}): Result {
+  const amount = options.amount ?? null;
+  return {
+    rule,
+    outcome,
+    message: outcome === "fail" || outcome === "flag" ? fillMessage(rule, options) : null,
+    max_passing_amount_cents: amount !== null && amount > 0 ? amount : null,
+    max_passing_quantity: options.quantity ?? null,
+    amountFailure: options.amountFailure ?? false,
+  };
+}
+
+function pass(rule: RuleId): Result {
+  return makeResult(rule, "pass");
+}
+
+function fail(rule: RuleId, options: Options = {}): Result {
+  return makeResult(rule, "fail", options);
+}
+
+function flag(rule: RuleId, options: Options = {}): Result {
+  return makeResult(rule, "flag", options);
+}
+
+function skip(rule: RuleId): Result {
+  return makeResult(rule, "skip");
+}
+
+function findAccount(ctx: RuleContext, id: string) {
+  return ctx.accounts.find((account) => account.id === id);
+}
+
+function money(cents: number): string {
+  return (Math.max(0, cents) / 100).toFixed(2);
+}
+
+function word(text: string, value: string): boolean {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return value.length > 0 && new RegExp("(?<![\\w])" + escaped + "(?![\\w])", "i").test(text);
+}
+
+function recipientName(proposal: Etransfer, ctx: RuleContext): string {
+  if (proposal.recipient.kind === "new") {
+    return proposal.recipient.name;
+  }
+  const id = proposal.recipient.contact_id;
+  return ctx.contacts.find((contact) => contact.id === id)?.name.split(/\s|\(/)[0] ?? "";
+}
+
+function billNamed(proposal: Payment, ctx: RuleContext): boolean {
+  const text = ctx.user_message.text;
+  if (proposal.bill_id === CARD_BILL_ID) {
+    return ACCOUNT_ALIASES.acc_card.some((alias) => word(text, alias));
+  }
+  const bill = ctx.bills.find((item) => item.id === proposal.bill_id);
+  if (!bill) {
+    return false;
+  }
+  const id = bill.id.replace(/^bill_/, "").replace(/_/g, " ");
+  const terms = [id, ...bill.payee.split(/[^a-z]+/i).filter((part) => part.length > 3)];
+  return terms.some((term) => word(text, term));
+}
+
+function fullValue(proposal: Proposal, ctx: RuleContext): number | null | undefined {
+  if (proposal.type !== "bill_payment") {
+    return undefined;
+  }
+  if (proposal.bill_id === CARD_BILL_ID) {
+    return findAccount(ctx, "acc_card")?.statement_balance_cents;
+  }
+  return ctx.bills.find((bill) => bill.id === proposal.bill_id)?.amount_cents;
+}
+
+function nameMatches(text: string, name: string): boolean {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts.length > 0 && parts.every((part) => word(text, part));
+}
+
+function savedBillAmount(proposal: Proposal, ctx: RuleContext, amounts: number[]): boolean {
+  if (proposal.type !== "bill_payment" || proposal.bill_id === CARD_BILL_ID) {
+    return false;
+  }
+  return amounts.length === 0 && billNamed(proposal, ctx) && ctx.bills.some((bill) =>
+    bill.id === proposal.bill_id && bill.saved && bill.amount_cents === proposal.amount_cents);
+}
+
+function confirmedEmail(proposal: Etransfer, ctx: RuleContext, emails: string[]): boolean {
+  if (proposal.recipient.kind !== "new" || !proposal.recipient.email) {
+    return true;
+  }
+  const email = proposal.recipient.email.toLowerCase();
+  return emails.some((item) => item.toLowerCase() === email)
+    || ctx.confirmed_recipient_email?.toLowerCase() === email;
+}
+
 // R0 protects against actions not authorized by the stored user message.
-function rule0(p: Proposal, ctx: RuleContext): Result {
-    const e = extractRequestEntities(ctx.user_message.text);
-    if (!e.has_action_intent)
-        return result('R0_intent', 'fail');
-    const savedBillAmount = p.type === 'bill_payment' && p.bill_id !== CARD_BILL_ID &&
-        e.amounts_cents.length === 0 && billNamed(p, ctx) &&
-        ctx.bills.some(b => b.id === p.bill_id && b.saved && b.amount_cents === p.amount_cents);
-    if (p.type !== 'trade' && !e.amounts_cents.includes(p.amount_cents) && !(e.full_amount && fullValue(p, ctx) === p.amount_cents) && !savedBillAmount)
-        return result('R0_intent', 'fail');
-    if (p.type === 'bill_payment' && !billNamed(p, ctx))
-        return result('R0_intent', 'fail');
-    if (p.type === 'etransfer') {
-        if (!nameMatches(ctx.user_message.text, recipientName(p, ctx)))
-            return result('R0_intent', 'fail');
-        if (p.recipient.kind === 'new' && p.recipient.email && !e.emails.map(email => email.toLowerCase()).includes(p.recipient.email.toLowerCase()) && ctx.confirmed_recipient_email?.toLowerCase() !== p.recipient.email.toLowerCase())
-            return result('R0_intent', 'fail');
+function rule0Intent(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R0_intent";
+  const entities = extractRequestEntities(ctx.user_message.text);
+  if (!entities.has_action_intent) {
+    return fail(rule);
+  }
+  if (proposal.type !== "trade") {
+    const amountMatches = entities.amounts_cents.includes(proposal.amount_cents);
+    const fullMatches = entities.full_amount && fullValue(proposal, ctx) === proposal.amount_cents;
+    if (!amountMatches && !fullMatches && !savedBillAmount(proposal, ctx, entities.amounts_cents)) {
+      return fail(rule);
     }
-    return result('R0_intent', 'pass');
+  }
+  if (proposal.type === "bill_payment" && !billNamed(proposal, ctx)) {
+    return fail(rule);
+  }
+  if (proposal.type === "etransfer") {
+    const named = nameMatches(ctx.user_message.text, recipientName(proposal, ctx));
+    if (!named || !confirmedEmail(proposal, ctx, entities.emails)) {
+      return fail(rule);
+    }
+  }
+  return pass(rule);
 }
+
 // R1 protects against unsupported actions and account combinations.
-function rule1(p: Proposal, ctx: RuleContext): Result {
-    let ok = ActionType.safeParse(p.type).success;
-    if (p.type === 'transfer') {
-        const from = account(ctx, p.from_account_id);
-        const to = account(ctx, p.to_account_id);
-        ok = !!from && !!to && from.id !== to.id && TRANSFER_MATRIX[from.type].includes(to.type);
-    }
-    else if (p.type === 'bill_payment' || p.type === 'etransfer') {
-        const from = account(ctx, p.from_account_id);
-        ok = !!from && PAYMENT_SOURCE_TYPES.includes(from.type);
-    }
-    else if (p.type === 'trade') {
-        const a = account(ctx, p.account_id);
-        ok = !!a && INVESTMENT_ACCOUNT_TYPES.includes(a.type) && Number.isSafeInteger(ctx.prices[p.ticker]) && ctx.prices[p.ticker] > 0 && ctx.prices[p.ticker] === p.price_cents;
-    }
-    return result('R1_allowed_action', ok ? 'pass' : 'fail');
+function rule1AllowedAction(proposal: Proposal, ctx: RuleContext): Result {
+  let allowed = ActionType.safeParse(proposal.type).success;
+  if (proposal.type === "transfer") {
+    const from = findAccount(ctx, proposal.from_account_id);
+    const to = findAccount(ctx, proposal.to_account_id);
+    allowed = !!from && !!to && from.id !== to.id && TRANSFER_MATRIX[from.type].includes(to.type);
+  } else if (proposal.type === "bill_payment" || proposal.type === "etransfer") {
+    const from = findAccount(ctx, proposal.from_account_id);
+    allowed = !!from && PAYMENT_SOURCE_TYPES.includes(from.type);
+  } else if (proposal.type === "trade") {
+    const account = findAccount(ctx, proposal.account_id);
+    const price = ctx.prices[proposal.ticker];
+    allowed = !!account && INVESTMENT_ACCOUNT_TYPES.includes(account.type)
+      && Number.isSafeInteger(price) && price > 0 && price === proposal.price_cents;
+  }
+  return allowed ? pass("R1_allowed_action") : fail("R1_allowed_action");
 }
+
 // R2 protects against paying an unsaved or unknown bill.
-function rule2(p: Proposal, ctx: RuleContext): Result {
-    return result('R2_saved_payee', p.type !== 'bill_payment' ? 'skip' : ctx.bills.some(b => b.id === p.bill_id && b.saved) ? 'pass' : 'fail');
+function rule2SavedPayee(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R2_saved_payee";
+  if (proposal.type !== "bill_payment") {
+    return skip(rule);
+  }
+  return ctx.bills.some((bill) => bill.id === proposal.bill_id && bill.saved) ? pass(rule) : fail(rule);
 }
+
 // R3 protects against unconfirmed or oversized payments to new recipients.
-function rule3(p: Proposal, ctx: RuleContext): Result {
-    if (p.type !== 'etransfer')
-        return result('R3_new_recipient', 'skip');
-    if (p.recipient.kind === 'saved')
-        return result('R3_new_recipient', ctx.contacts.some(c => c.id === (p.recipient.kind === 'saved' && p.recipient.contact_id) && c.saved) ? 'pass' : 'fail', { name: recipientName(p, ctx) });
-    const max = ctx.limits.new_recipient_limit_cents;
-    return result('R3_new_recipient', p.amount_cents <= max ? 'flag' : 'fail', { name: p.recipient.name }, p.amount_cents > max ? max : null, null, p.amount_cents > max);
+function rule3NewRecipient(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R3_new_recipient";
+  if (proposal.type !== "etransfer") {
+    return skip(rule);
+  }
+  if (proposal.recipient.kind === "saved") {
+    const id = proposal.recipient.contact_id;
+    if (ctx.contacts.some((contact) => contact.id === id && contact.saved)) {
+      return pass(rule);
+    }
+    return fail(rule, { values: { name: recipientName(proposal, ctx) } });
+  }
+  const max = ctx.limits.new_recipient_limit_cents;
+  const values = { name: proposal.recipient.name };
+  if (proposal.amount_cents <= max) {
+    return flag(rule, { values });
+  }
+  return fail(rule, { values, amount: max, amountFailure: true });
 }
+
 // R4 protects the source balance and prevents overpaying the card.
-function rule4(p: Proposal, ctx: RuleContext): Result {
-    if (p.type === 'trade')
-        return result('R4_enough_money', 'skip');
-    const a = account(ctx, p.from_account_id);
-    if (!a)
-        return result('R4_enough_money', 'fail', { account: 'account', max: '0.00' });
-    let max = a.balance_cents - (a.type === 'chequing' ? ctx.limits.min_buffer_cents : 0);
-    const owed = p.type === 'bill_payment' && p.bill_id === CARD_BILL_ID ? account(ctx, 'acc_card')?.balance_cents ?? 0 : Infinity;
-    const cardLimited = owed <= max;
+function rule4EnoughMoney(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R4_enough_money";
+  if (proposal.type === "trade") {
+    return skip(rule);
+  }
+  const account = findAccount(ctx, proposal.from_account_id);
+  if (!account) {
+    return fail(rule, { values: { account: "account", max: "0.00" } });
+  }
+  const floor = account.type === "chequing" ? ctx.limits.min_buffer_cents : 0;
+  let max = account.balance_cents - floor;
+  let variant: string | undefined;
+  if (account.type !== "chequing") {
+    variant = RULE_MESSAGE_VARIANTS.R4_no_overdraft;
+  }
+  if (proposal.type === "bill_payment" && proposal.bill_id === CARD_BILL_ID) {
+    const owed = findAccount(ctx, "acc_card")?.balance_cents ?? 0;
+    if (owed <= max) {
+      variant = RULE_MESSAGE_VARIANTS.R4_card_overpay;
+    }
     max = Math.min(max, owed);
-    const variant = cardLimited ? RULE_MESSAGE_VARIANTS.R4_card_overpay : a.type !== 'chequing' ? RULE_MESSAGE_VARIANTS.R4_no_overdraft : undefined;
-    return result('R4_enough_money', p.amount_cents <= max ? 'pass' : 'fail', { account: a.name, max: money(max) }, p.amount_cents > max ? max : null, null, p.amount_cents > max, variant);
+  }
+  if (proposal.amount_cents <= max) {
+    return pass(rule);
+  }
+  return fail(rule, {
+    values: { account: account.name, max: money(max) }, amount: max, amountFailure: true, variant,
+  });
 }
+
 // R5 protects the daily external payment limit.
-function rule5(p: Proposal, ctx: RuleContext): Result {
-    if (p.type !== 'bill_payment' && p.type !== 'etransfer')
-        return result('R5_daily_limit', 'skip');
-    const max = ctx.limits.daily_limit_cents - ctx.daily_used_cents;
-    return result('R5_daily_limit', p.amount_cents <= max ? 'pass' : 'fail', {}, p.amount_cents > max ? max : null, null, p.amount_cents > max);
+function rule5DailyLimit(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R5_daily_limit";
+  if (proposal.type !== "bill_payment" && proposal.type !== "etransfer") {
+    return skip(rule);
+  }
+  const max = ctx.limits.daily_limit_cents - ctx.daily_used_cents;
+  return proposal.amount_cents <= max ? pass(rule) : fail(rule, { amount: max, amountFailure: true });
 }
+
 // R6 protects annual registered-account contribution room.
-function rule6(p: Proposal, ctx: RuleContext): Result {
-    if (p.type !== 'transfer')
-        return result('R6_contribution_room', 'skip');
-    const to = account(ctx, p.to_account_id);
-    if (!to || (to.type !== 'tfsa' && to.type !== 'rrsp'))
-        return result('R6_contribution_room', 'skip');
-    const max = ctx.room.find(r => r.account_type === to.type && r.year === Number(ctx.today.slice(0, 4)))?.room_remaining_cents ?? 0;
-    return result('R6_contribution_room', p.amount_cents <= max ? 'pass' : 'fail', { room: money(max) }, p.amount_cents > max ? max : null, null, p.amount_cents > max);
+function rule6ContributionRoom(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R6_contribution_room";
+  if (proposal.type !== "transfer") {
+    return skip(rule);
+  }
+  const to = findAccount(ctx, proposal.to_account_id);
+  if (!to || (to.type !== "tfsa" && to.type !== "rrsp")) {
+    return skip(rule);
+  }
+  const year = Number(ctx.today.slice(0, 4));
+  const max = ctx.room.find((room) => room.account_type === to.type && room.year === year)
+    ?.room_remaining_cents ?? 0;
+  if (proposal.amount_cents <= max) {
+    return pass(rule);
+  }
+  return fail(rule, { values: { room: money(max) }, amount: max, amountFailure: true });
 }
+
 // R7 protects against buying beyond cash or selling unheld shares.
-function rule7(p: Proposal, ctx: RuleContext): Result {
-    if (p.type !== 'trade')
-        return result('R7_trade_limits', 'skip');
-    const held = ctx.holdings.find(h => h.account_id === p.account_id && h.ticker === p.ticker)?.quantity ?? 0;
-    const price = ctx.prices[p.ticker];
-    const max = p.side === 'sell' ? held : price > 0 ? Math.max(0, Math.floor(Math.min(account(ctx, p.account_id)?.balance_cents ?? 0, ctx.limits.max_trade_cents) / price)) : 0;
-    const cash = account(ctx, p.account_id)?.balance_cents ?? 0;
-    const variant = p.side === 'buy' ? (cash < ctx.limits.max_trade_cents ? RULE_MESSAGE_VARIANTS.R7_buy_cash : RULE_MESSAGE_VARIANTS.R7_buy_max_trade) : undefined;
-    return result('R7_trade_limits', p.quantity <= max ? 'pass' : 'fail', { n: String(p.side === 'sell' ? held : max), ticker: p.ticker }, null, p.quantity > max ? max : null, false, variant);
+function rule7TradeLimits(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R7_trade_limits";
+  if (proposal.type !== "trade") {
+    return skip(rule);
+  }
+  const held = ctx.holdings.find((holding) =>
+    holding.account_id === proposal.account_id && holding.ticker === proposal.ticker)?.quantity ?? 0;
+  const cash = findAccount(ctx, proposal.account_id)?.balance_cents ?? 0;
+  const price = ctx.prices[proposal.ticker];
+  let max = held;
+  let variant: string | undefined;
+  if (proposal.side === "buy") {
+    max = price > 0 ? Math.max(0, Math.floor(Math.min(cash, ctx.limits.max_trade_cents) / price)) : 0;
+    variant = cash < ctx.limits.max_trade_cents
+      ? RULE_MESSAGE_VARIANTS.R7_buy_cash : RULE_MESSAGE_VARIANTS.R7_buy_max_trade;
+  }
+  if (proposal.quantity <= max) {
+    return pass(rule);
+  }
+  return fail(rule, { values: { n: String(max), ticker: proposal.ticker }, quantity: max, variant });
 }
+
+function tradeMatches(proposal: Trade, entities: ReturnType<typeof extractRequestEntities>): boolean {
+  const amountMismatch = entities.amounts_cents.some((amount) => {
+    if (proposal.side === "buy" && proposal.price_cents > 0) {
+      return proposal.quantity !== Math.floor(amount / proposal.price_cents);
+    }
+    return amount !== proposal.quantity * proposal.price_cents;
+  });
+  return !amountMismatch && !entities.tickers.some((ticker) => ticker !== proposal.ticker)
+    && !entities.quantities.some((quantity) => quantity !== proposal.quantity)
+    && (!entities.side || entities.side === proposal.side);
+}
+
+function recipientMatches(proposal: Etransfer, ctx: RuleContext): boolean {
+  const name = recipientName(proposal, ctx);
+  const text = ctx.user_message.text;
+  if (!nameMatches(text, name)) {
+    return false;
+  }
+  const targets = [...text.matchAll(/\b(?:to|send)\s+(?:my\s+)?([a-z][a-z'-]*)/gi)]
+    .map((match) => match[1]);
+  const aliases = Object.values(ACCOUNT_ALIASES).flat();
+  return !targets.some((target) =>
+    !["money", "funds", "cash", "payment"].includes(target.toLowerCase())
+    && !word(name, target) && !aliases.some((alias) => alias.toLowerCase() === target.toLowerCase()));
+}
+
+function proposalAccounts(proposal: Proposal): string[] {
+  if (proposal.type === "transfer") {
+    return [proposal.from_account_id, proposal.to_account_id];
+  }
+  if (proposal.type === "trade") {
+    return [proposal.account_id];
+  }
+  const ids: string[] = [proposal.from_account_id];
+  if (proposal.type === "bill_payment" && proposal.bill_id === CARD_BILL_ID) {
+    ids.push("acc_card");
+  }
+  return ids;
+}
+
+function transferRolesMatch(proposal: Transfer, text: string, accounts: string[]): boolean {
+  for (const [id, aliases] of Object.entries(ACCOUNT_ALIASES)) {
+    for (const alias of aliases) {
+      const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const from = new RegExp("\\bfrom\\s+(?:my\\s+|the\\s+)?" + escaped + "\\b", "i");
+      const to = new RegExp("\\b(?:to|into)\\s+(?:my\\s+|the\\s+)?" + escaped + "\\b", "i");
+      if ((from.test(text) && id !== proposal.from_account_id)
+        || (to.test(text) && id !== proposal.to_account_id)) {
+        return false;
+      }
+    }
+  }
+  if (!/\b(?:from|to|into)\b/i.test(text) && accounts.length >= 2) {
+    return accounts[0] === proposal.from_account_id && accounts[1] === proposal.to_account_id;
+  }
+  return true;
+}
+
 // R8 protects against changing the user's specified action details.
-function rule8(p: Proposal, ctx: RuleContext): Result {
-    const e = extractRequestEntities(ctx.user_message.text);
-    if (p.type !== 'trade' && e.amounts_cents.some(a => a !== p.amount_cents))
-        return result('R8_matches_request', 'fail');
-    if (p.type === 'trade' && (e.amounts_cents.some(a => a !== p.quantity * p.price_cents) || e.tickers.some(t => t !== p.ticker) || e.quantities.some(q => q !== p.quantity) || (e.side && e.side !== p.side)))
-        return result('R8_matches_request' as RuleId, 'fail');
-    if (p.type === 'etransfer') {
-        const name = recipientName(p, ctx);
-        if (!nameMatches(ctx.user_message.text, name))
-            return result('R8_matches_request', 'fail');
-        const targets = [...ctx.user_message.text.matchAll(/\b(?:to|send)\s+(?:my\s+)?([a-z][a-z'-]*)/gi)].map(m => m[1]);
-        if (targets.some(target => !['money', 'funds', 'cash', 'payment'].includes(target.toLowerCase()) && !word(name, target) && !Object.values(ACCOUNT_ALIASES).flat().some(alias => alias.toLowerCase() === target.toLowerCase())))
-            return result('R8_matches_request', 'fail');
-    }
-    const ids = p.type === 'transfer' ? [p.from_account_id, p.to_account_id] : p.type === 'trade' ? [p.account_id] : [p.from_account_id, ...(p.type === 'bill_payment' && p.bill_id === CARD_BILL_ID ? ['acc_card'] : [])];
-    if (e.accounts_mentioned.some(id => !ids.includes(id)))
-        return result('R8_matches_request', 'fail');
-    if (p.type === 'transfer') {
-        const text = ctx.user_message.text.toLowerCase();
-        for (const [id, aliases] of Object.entries(ACCOUNT_ALIASES))
-            for (const alias of aliases) {
-                const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                if (new RegExp(`\\bfrom\\s+(?:my\\s+|the\\s+)?${escaped}\\b`, 'i').test(text) && id !== p.from_account_id)
-                    return result('R8_matches_request', 'fail');
-                if (new RegExp(`\\b(?:to|into)\\s+(?:my\\s+|the\\s+)?${escaped}\\b`, 'i').test(text) && id !== p.to_account_id)
-                    return result('R8_matches_request', 'fail');
-            }
-        if (!/\b(?:from|to|into)\b/i.test(text) && e.accounts_mentioned.length >= 2 && (e.accounts_mentioned[0] !== p.from_account_id || e.accounts_mentioned[1] !== p.to_account_id))
-            return result('R8_matches_request', 'fail');
-    }
-    return result('R8_matches_request', 'pass');
+function rule8MatchesRequest(proposal: Proposal, ctx: RuleContext): Result {
+  const rule = "R8_matches_request";
+  const entities = extractRequestEntities(ctx.user_message.text);
+  if (proposal.type !== "trade" && entities.amounts_cents.some((a) => a !== proposal.amount_cents)) {
+    return fail(rule);
+  }
+  if (proposal.type === "trade" && !tradeMatches(proposal, entities)) {
+    return fail(rule);
+  }
+  if (proposal.type === "etransfer" && !recipientMatches(proposal, ctx)) {
+    return fail(rule);
+  }
+  const ids = proposalAccounts(proposal);
+  if (entities.accounts_mentioned.some((id) => !ids.includes(id))) {
+    return fail(rule);
+  }
+  if (proposal.type === "transfer"
+    && !transferRolesMatch(proposal, ctx.user_message.text, entities.accounts_mentioned)) {
+    return fail(rule);
+  }
+  return pass(rule);
 }
+
 export const evaluateRules: EvaluateRules = (proposal, ctx) => {
-    const checks = [rule0(proposal, ctx), rule1(proposal, ctx), rule2(proposal, ctx), rule3(proposal, ctx), rule4(proposal, ctx), rule5(proposal, ctx), rule6(proposal, ctx), rule7(proposal, ctx), rule8(proposal, ctx)];
-    const failures = checks.filter(c => c.outcome === 'fail');
-    const amountMax = failures.length && failures.every(c => c.amountFailure && c.max_passing_amount_cents !== null) ? Math.min(...failures.map(c => c.max_passing_amount_cents!)) : null;
-    const quantities = failures.map(c => c.max_passing_quantity).filter((n): n is number => n !== null);
-    return { allowed: failures.length === 0, checks: checks.map(c => ({ rule: c.rule, outcome: c.outcome, message: c.message, max_passing_amount_cents: c.max_passing_amount_cents, max_passing_quantity: c.max_passing_quantity })), requires_second_confirmation: checks[3].outcome === 'flag', max_passing_amount_cents: amountMax, max_passing_quantity: quantities.length ? Math.min(...quantities) : null, primary_message: failures[0]?.message ?? null };
+  const checks = [
+    rule0Intent(proposal, ctx), rule1AllowedAction(proposal, ctx), rule2SavedPayee(proposal, ctx),
+    rule3NewRecipient(proposal, ctx), rule4EnoughMoney(proposal, ctx), rule5DailyLimit(proposal, ctx),
+    rule6ContributionRoom(proposal, ctx), rule7TradeLimits(proposal, ctx),
+    rule8MatchesRequest(proposal, ctx),
+  ];
+  const failures = checks.filter((check) => check.outcome === "fail");
+  let amountMax: number | null = null;
+  if (failures.length && failures.every((check) => check.amountFailure
+    && check.max_passing_amount_cents !== null)) {
+    amountMax = Math.min(...failures.map((check) => check.max_passing_amount_cents!));
+  }
+  const quantities = failures.map((check) => check.max_passing_quantity)
+    .filter((quantity): quantity is number => quantity !== null);
+  return {
+    allowed: failures.length === 0,
+    checks: checks.map(({ rule, outcome, message, max_passing_amount_cents, max_passing_quantity }) => ({
+      rule, outcome, message, max_passing_amount_cents, max_passing_quantity,
+    })),
+    requires_second_confirmation: checks[3].outcome === "flag",
+    max_passing_amount_cents: amountMax,
+    max_passing_quantity: quantities.length ? Math.min(...quantities) : null,
+    primary_message: failures[0]?.message ?? null,
+  };
 };
