@@ -5,6 +5,7 @@
 // A lost status update throws, rolling back all changes in the transaction.
 import { CARD_BILL_ID, Proposal, type ActionCard, type Proposal as ActionProposal } from "../../contracts";
 import type { Db, Tx } from "../db/types";
+import { tradeDescription } from "../ledger-format";
 import { evaluateRules } from "../rules";
 import { loadRuleContext } from "./context";
 import { audit, getAction, lockSession, toActionCard, type ActionRow } from "./service";
@@ -15,6 +16,8 @@ type LedgerEntry = {
   kind: string;
   category: string;
   label: string;
+  /** Defaults to the label. */
+  description?: string;
   group: string | null;
 };
 
@@ -25,9 +28,10 @@ async function ledger(
     await tx.query(
       `insert into transactions (session_id, id, account_id, posted_on, amount_cents, merchant,
        description, category, kind, transfer_group_id, action_id)
-       values ($1, $2, $3, $4, $5, $6, $6, $7, $8, $9, $10)`,
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [sessionId, `txn_act_${actionId.slice(0, 8)}_${index + 1}`, entry.account, today,
-        entry.amount, entry.label, entry.category, entry.kind, entry.group, actionId],
+        entry.amount, entry.label, entry.description ?? entry.label, entry.category, entry.kind,
+        entry.group, actionId],
     );
   }
 }
@@ -109,8 +113,15 @@ async function trade(
     await tx.query(`update holdings set quantity = quantity - $4
       where session_id = $1 and account_id = $2 and ticker = $3`, [sid, p.account_id, p.ticker, p.quantity]);
   }
-  await ledger(tx, sid, id, today, [{ account: p.account_id, amount: delta, kind: `trade_${p.side}`,
-    category: "investments", label: p.ticker, group: null }]);
+  await ledger(tx, sid, id, today, [{
+    account: p.account_id,
+    amount: delta,
+    kind: `trade_${p.side}`,
+    category: "investments",
+    label: p.ticker,
+    description: tradeDescription(p.side, p.quantity, p.ticker),
+    group: null,
+  }]);
 }
 
 async function applyEffects(

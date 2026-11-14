@@ -7,6 +7,8 @@ const turbopackRoot = process.env.COIN_TURBOPACK_ROOT;
 
 const nextConfig: NextConfig = {
   cacheComponents: true,
+  // PGlite ships WASM and data files; load it from node_modules, not the bundle.
+  serverExternalPackages: ["@electric-sql/pglite"],
   partialPrefetching: true,
   turbopack: {
     ...(turbopackRoot ? { root: turbopackRoot } : {}),

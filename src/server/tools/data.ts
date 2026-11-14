@@ -2,7 +2,7 @@ import {
   addDays, daysBetween, PERSONA, SPENDING_KINDS,
   type AccountId, type HoldingView, type SpendingRow, type Transaction,
 } from "../../contracts";
-import { holdingsAt } from "../../../scripts/seed/generate";
+import { holdingsTimeline, priceIndex } from "./history";
 import * as q from "../db/queries";
 import type { Tx } from "../db/types";
 
@@ -73,20 +73,22 @@ export async function cashflow(db: Tx, sid: string, from: string, to: string) {
 export async function portfolioSeries(
   db: Tx, sid: string, from: string, to: string, account: AccountId | null, interval: "week" | "month",
 ) {
-  const [ps, session] = await Promise.all([q.prices(db, sid), q.sessionInfo(db, sid)]);
+  const [prices, current, transactions] = await Promise.all([
+    q.prices(db, sid), q.holdings(db, sid), q.transactions(db, sid),
+  ]);
+  const closes = priceIndex(prices);
+  const timeline = holdingsTimeline(current, transactions);
+  const step = interval === "week" ? 7 : 30;
+
   const result: { date: string; value_cents: number }[] = [];
-  for (let date = from; date <= to;) {
-    const hs = holdingsAt(addDays(date, -session.date_offset_days));
+  for (let date = from; ; date = addDays(date, step) > to ? to : addDays(date, step)) {
     let value = 0;
-    for (const h of hs) {
-      if (account && h.account_id !== account) continue;
-      const price = ps.filter(p => p.ticker === h.ticker && p.date <= date).at(-1);
-      value += h.quantity * (price?.close_cents ?? 0);
+    for (const holding of timeline.at(date)) {
+      if (account && holding.account_id !== account) continue;
+      value += holding.quantity * closes.closeOn(holding.ticker, date);
     }
     result.push({ date, value_cents: value });
     if (date === to) break;
-    const next = interval === "week" ? addDays(date, 7) : addDays(date, 30);
-    date = next > to ? to : next;
   }
   return result;
 }

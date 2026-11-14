@@ -1,30 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const WINDOW_SECONDS = 60;
 const RADIUS = 24;
 const RING_LENGTH = 2 * Math.PI * RADIUS;
 
-/** The undo ring: drains over the real 60 seconds, with a live label. */
-export function UndoRing() {
-  const [startedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(startedAt);
+function secondsUntil(executeAt: number, now: number): number {
+  return Math.max(0, Math.ceil((executeAt - now) / 1000));
+}
+
+/**
+ * The undo ring. With `executeAt` (ISO time from the server) it counts down to
+ * that moment and calls `onElapsed` once at zero; without it, it runs a fresh
+ * 60 seconds (the design preview).
+ */
+export function UndoRing({ executeAt, onElapsed }: { executeAt?: string | null; onElapsed?: () => void }) {
+  const [target] = useState(() => (executeAt ? Date.parse(executeAt) : Date.now() + WINDOW_SECONDS * 1000));
+  const [now, setNow] = useState(() => Date.now());
+  const fired = useRef(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
   }, []);
 
-  const elapsed = Math.min(WINDOW_SECONDS, Math.floor((now - startedAt) / 1000));
-  const secondsLeft = WINDOW_SECONDS - elapsed;
+  const secondsLeft = secondsUntil(target, now);
+
+  useEffect(() => {
+    if (secondsLeft === 0 && !fired.current) {
+      fired.current = true;
+      onElapsed?.();
+    }
+  }, [secondsLeft, onElapsed]);
+
+  const drained = 1 - secondsLeft / WINDOW_SECONDS;
 
   return (
     <div className="relative grid h-14 w-14 shrink-0 place-items-center" aria-live="polite">
       <svg className="absolute inset-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true">
         <circle cx="28" cy="28" r={RADIUS} fill="none" stroke="var(--pending-soft)" strokeWidth="4" />
         <circle
-          className="coin-undo-ring"
           cx="28"
           cy="28"
           r={RADIUS}
@@ -33,7 +49,8 @@ export function UndoRing() {
           strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={RING_LENGTH}
-          style={{ ["--ring-length" as string]: `${RING_LENGTH}` }}
+          strokeDashoffset={RING_LENGTH * drained}
+          style={{ transition: "stroke-dashoffset 250ms linear" }}
         />
       </svg>
       <span className="money text-sm font-extrabold text-pending">{secondsLeft}s</span>

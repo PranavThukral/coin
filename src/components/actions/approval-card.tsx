@@ -1,12 +1,26 @@
-// Static approval card in every state. W7 builds the live version from this.
-// Each state has its own frame so you can tell them apart at a glance:
+"use client";
+
+// The approval card. Each state has its own frame so it reads at a glance:
 //   proposed   plain card            blocked    red edge bar
 //   pending    violet ring + timer   executed   green ring, check draws in, one settle pulse
 //   cancelled  light red border, amount struck through, "Nothing moved."
-import type { ActionCard, CheckResult } from "../../../contracts";
-import { AlertIcon, ArrowIcon, CheckIcon, ClockIcon, CrossIcon, UndoIcon } from "./icons";
-import { UndoRing } from "./live-bits";
-import { money } from "./preview-data";
+// Without handlers it renders as a static preview (the design page).
+import { useState } from "react";
+import type { ActionCard, CheckResult } from "../../contracts";
+import { money } from "../../lib/format";
+import { AlertIcon, ArrowIcon, CheckIcon, ClockIcon, CrossIcon, UndoIcon } from "../ui/icons";
+import { UndoRing } from "../ui/live-bits";
+
+export interface CardHandlers {
+  onApprove?: () => void;
+  onDismiss?: () => void;
+  onUndo?: () => void;
+  onExecuteNow?: () => void;
+  onConfirmRecipient?: (email: string) => void;
+  onUseInstead?: (amountCents: number) => void;
+  /** The undo window ended on the client clock; the app asks the server to settle. */
+  onWindowElapsed?: () => void;
+}
 
 const FRAME: Record<string, string> = {
   proposed: "border border-border",
@@ -26,16 +40,17 @@ function stateOf(card: ActionCard): CardState {
   return card.status;
 }
 
+const STATUS: Record<CardState, { tone: string; icon: React.ReactNode; text: string }> = {
+  proposed: { tone: "text-muted", icon: null, text: "Ready for your approval" },
+  confirm: { tone: "text-warning", icon: <AlertIcon />, text: "New recipient: confirm first" },
+  blocked: { tone: "text-blocked", icon: <CrossIcon />, text: "Blocked by a check" },
+  pending_undo: { tone: "text-pending", icon: <ClockIcon />, text: "Approved. Sending in 60 seconds" },
+  executed: { tone: "text-gain", icon: null, text: "Done" },
+  cancelled: { tone: "text-loss", icon: <UndoIcon />, text: "Cancelled" },
+};
+
 function StatusLine({ state }: { state: CardState }) {
-  const content: Record<CardState, { tone: string; icon: React.ReactNode; text: string }> = {
-    proposed: { tone: "text-muted", icon: null, text: "Ready for your approval" },
-    confirm: { tone: "text-warning", icon: <AlertIcon />, text: "New recipient: confirm first" },
-    blocked: { tone: "text-blocked", icon: <CrossIcon />, text: "Blocked by a check" },
-    pending_undo: { tone: "text-pending", icon: <ClockIcon />, text: "Approved. Sending in 60 seconds" },
-    executed: { tone: "text-gain", icon: null, text: "Done" },
-    cancelled: { tone: "text-loss", icon: <UndoIcon />, text: "Cancelled" },
-  };
-  const { tone, icon, text } = content[state];
+  const { tone, icon, text } = STATUS[state];
   return (
     <p className={`flex items-center gap-1.5 text-sm font-bold ${tone}`}>
       {icon}
@@ -83,43 +98,60 @@ function CheckList({ checks }: { checks: CheckResult[] }) {
   );
 }
 
-function RecipientConfirmation() {
+function RecipientConfirmation({ name, onEmail }: { name: string; onEmail: (email: string) => void }) {
   return (
     <div className="mt-4 rounded-coin-sm bg-warning-soft p-3">
-      <label className="text-sm font-bold text-foreground" htmlFor="preview-email">
-        Alex&rsquo;s email
+      <label className="text-sm font-bold text-foreground">
+        {name}&rsquo;s email
+        <input
+          type="email"
+          autoComplete="off"
+          placeholder="name@example.com"
+          onChange={(event) => onEmail(event.target.value)}
+          className="mt-1.5 block w-full rounded-coin-sm border border-border-strong bg-surface px-3 py-2 text-sm font-medium text-foreground placeholder:text-subtle"
+        />
       </label>
-      <input
-        id="preview-email"
-        type="email"
-        placeholder="name@example.com"
-        className="mt-1.5 w-full rounded-coin-sm border border-border-strong bg-surface px-3 py-2 text-sm text-foreground placeholder:text-subtle"
-        disabled
-      />
     </div>
   );
 }
 
-function Actions({ card, state }: { card: ActionCard; state: CardState }) {
-  const primary = "rounded-full bg-accent px-5 py-2.5 text-sm font-extrabold text-accent-ink";
-  const secondary = "rounded-full border border-border-strong px-5 py-2.5 text-sm font-bold text-foreground";
+const PRIMARY = "rounded-full bg-accent px-5 py-2.5 text-sm font-extrabold text-accent-ink disabled:opacity-50";
+const SECONDARY = "rounded-full border border-border-strong px-5 py-2.5 text-sm font-bold text-foreground disabled:opacity-50";
+
+function Actions(props: { card: ActionCard; state: CardState; email: string; busy: boolean } & CardHandlers) {
+  const { card, state, email, busy } = props;
 
   if (state === "proposed" || state === "confirm") {
+    const confirming = state === "confirm";
+    const primaryClick = confirming ? () => props.onConfirmRecipient?.(email) : props.onApprove;
     return (
       <>
-        <span className={primary}>{state === "confirm" ? "Confirm new recipient" : "Approve"}</span>
-        <span className={secondary}>Dismiss</span>
+        <button type="button" className={PRIMARY} disabled={busy || (confirming && !email)} onClick={primaryClick}>
+          {confirming ? "Confirm new recipient" : "Approve"}
+        </button>
+        <button type="button" className={SECONDARY} disabled={busy} onClick={props.onDismiss}>
+          Dismiss
+        </button>
       </>
     );
   }
   if (state === "blocked" && card.max_passing_amount_cents !== null) {
-    return <span className={`money ${primary}`}>Use {money(card.max_passing_amount_cents)} instead</span>;
+    const amount = card.max_passing_amount_cents;
+    return (
+      <button type="button" className={`money ${PRIMARY}`} disabled={busy} onClick={() => props.onUseInstead?.(amount)}>
+        Use {money(amount)} instead
+      </button>
+    );
   }
   if (state === "pending_undo") {
     return (
       <>
-        <span className={`${secondary} border-pending text-pending`}>Undo</span>
-        <span className={primary}>Execute now</span>
+        <button type="button" className={`${SECONDARY} border-pending text-pending`} disabled={busy} onClick={props.onUndo}>
+          Undo
+        </button>
+        <button type="button" className={PRIMARY} disabled={busy} onClick={props.onExecuteNow}>
+          Execute now
+        </button>
       </>
     );
   }
@@ -155,9 +187,16 @@ function Outcome({ card, state }: { card: ActionCard; state: CardState }) {
   return null;
 }
 
-export function ApprovalCardPreview({ card }: { card: ActionCard }) {
+export function ApprovalCard({
+  card,
+  busy = false,
+  error = null,
+  ...handlers
+}: { card: ActionCard; busy?: boolean; error?: string | null } & CardHandlers) {
+  const [email, setEmail] = useState("");
   const state = stateOf(card);
   const showChecks = state === "proposed" || state === "confirm" || state === "blocked";
+  const recipientName = (card.to_label ?? "this person").replace(/\s*\(new recipient\)$/, "");
 
   return (
     <article className={`rounded-coin bg-surface p-5 shadow-coin ${FRAME[state]}`}>
@@ -166,7 +205,7 @@ export function ApprovalCardPreview({ card }: { card: ActionCard }) {
           <StatusLine state={state} />
           <h4 className="mt-1.5 text-lg font-extrabold leading-snug">{card.title}</h4>
         </div>
-        {state === "pending_undo" && <UndoRing />}
+        {state === "pending_undo" && <UndoRing executeAt={card.execute_at} onElapsed={handlers.onWindowElapsed} />}
         {state === "executed" && <ExecutedBadge />}
       </div>
 
@@ -178,12 +217,18 @@ export function ApprovalCardPreview({ card }: { card: ActionCard }) {
       </p>
       <Outcome card={card} state={state} />
 
-      {state === "confirm" && <RecipientConfirmation />}
+      {state === "confirm" && <RecipientConfirmation name={recipientName} onEmail={setEmail} />}
       {showChecks && <CheckList checks={card.checks} />}
+      {error && <p className="mt-3 text-sm font-bold text-loss">{error}</p>}
 
       <div className="mt-5 flex flex-wrap gap-2 empty:hidden">
-        <Actions card={card} state={state} />
+        <Actions card={card} state={state} email={email} busy={busy} {...handlers} />
       </div>
     </article>
   );
+}
+
+/** Static preview for the design page. */
+export function ApprovalCardPreview({ card }: { card: ActionCard }) {
+  return <ApprovalCard card={card} />;
 }

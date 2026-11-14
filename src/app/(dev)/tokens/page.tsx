@@ -1,8 +1,8 @@
 // Design review page (dev only), v2. Renders Coin's identity in light and
 // dark so Pranav can approve it before any product screen is built.
-import { ApprovalCardPreview } from "./approval-card";
-import { Replay } from "./live-bits";
-import { MASCOT_OPTIONS, Mascot, type MascotMood } from "./mascot";
+import { ApprovalCardPreview } from "../../../components/actions/approval-card";
+import { Replay } from "../../../components/ui/live-bits";
+import { MASCOT_OPTIONS, Mascot, type MascotMood } from "../../../components/coin/mascot";
 import { chartSeries, exampleCards, money, outflow } from "./preview-data";
 
 const GREYS = ["grey-0", "grey-50", "grey-100", "grey-200", "grey-300", "grey-500", "grey-700", "grey-900"];

@@ -61,11 +61,11 @@
   --pending-soft: #ece7ff;
 
   --chart-1: #0a7c55;
-  --chart-2: #d99a00;
+  --chart-2: #b88200;
   --chart-3: #5b3fd4;
-  --chart-4: #2b78c9;
-  --chart-5: #d1426f;
-  --chart-6: #55626b;
+  --chart-4: #c8365f;
+  --chart-5: #0e94b0;
+  --chart-6: #7f6a00;
 
   --shadow-card: 0 1px 2px rgba(17, 24, 20, 0.06), 0 8px 24px rgba(17, 24, 20, 0.08);
 }
@@ -108,12 +108,12 @@
   --pending: #a994ff;
   --pending-soft: #262046;
 
-  --chart-1: #3fd69a;
-  --chart-2: #f5bd3a;
-  --chart-3: #a994ff;
-  --chart-4: #6cb2ff;
-  --chart-5: #ff7fa8;
-  --chart-6: #a6b3bb;
+  --chart-1: #1fa572;
+  --chart-2: #b98410;
+  --chart-3: #8d72f0;
+  --chart-4: #e95887;
+  --chart-5: #2a9cc8;
+  --chart-6: #a08f2a;
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
@@ -158,12 +158,12 @@
     --pending: #a994ff;
     --pending-soft: #262046;
 
-    --chart-1: #3fd69a;
-    --chart-2: #f5bd3a;
-    --chart-3: #a994ff;
-    --chart-4: #6cb2ff;
-    --chart-5: #ff7fa8;
-    --chart-6: #a6b3bb;
+    --chart-1: #1fa572;
+    --chart-2: #b98410;
+    --chart-3: #8d72f0;
+    --chart-4: #e95887;
+    --chart-5: #2a9cc8;
+    --chart-6: #a08f2a;
 
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
   }

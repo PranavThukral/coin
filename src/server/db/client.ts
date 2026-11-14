@@ -40,12 +40,30 @@ export function postgresDb(url: string): Db {
 
 let shared: Db | null = null;
 
+/** In development without DATABASE_URL: an in-process, seeded Postgres. */
+function lazyLocalDb(): Db {
+  const ready = import("./local-db").then((module) => module.localDb());
+  return {
+    async query<T>(text: string, params?: unknown[]) {
+      return (await ready).query<T>(text, params);
+    },
+    async transaction<T>(fn: (tx: Tx) => Promise<T>) {
+      return (await ready).transaction(fn);
+    },
+  };
+}
+
 /** The app-wide database handle. */
 export function db(): Db {
   if (!shared) {
     const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL is not set");
-    shared = postgresDb(url);
+    if (url) {
+      shared = postgresDb(url);
+    } else if (process.env.NODE_ENV !== "production") {
+      shared = lazyLocalDb();
+    } else {
+      throw new Error("DATABASE_URL is not set");
+    }
   }
   return shared;
 }
