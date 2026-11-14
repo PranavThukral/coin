@@ -37,6 +37,10 @@ const merchants: Merchant[] = [
   { name: "Brightvale Dental", category: "health_fitness", cents: 18500, interval: 182, offset: 18 },
   { name: "Riverbend Gifts", category: "gifts_social", cents: 4500, interval: 75, offset: 9 },
   { name: "Northcrest Service", category: "fees", cents: 450, interval: 60, offset: 11 },
+  { name: "Harvest Lane Market", category: "groceries", cents: 17500, interval: 7, offset: 1 },
+  { name: "Meadow Kitchen", category: "dining", cents: 14500, interval: 7, offset: 3 },
+  { name: "Stonebridge Outfitters", category: "shopping", cents: 16000, interval: 7, offset: 4 },
+  { name: "Evergreen Supplies", category: "shopping", cents: 15000, interval: 7, offset: 6 },
 ];
 const subscriptions = [
   ["Moonbeam Audio", 1299, 8], ["Pagehaven", 999, 11],
@@ -89,8 +93,10 @@ function generateSpending(ledger: Ledger, date: string, index: number) {
     const variation = 80 + (index * 17 + merchant.offset * 13) % 41;
     const trend = merchant.category === "dining" && date >= "2026-08-01" ? 135 : 100;
     const amount = Math.round(merchant.cents * variation * trend / 10000);
+    const format = merchant.category === "groceries" ? "DEBIT PURCHASE" :
+      merchant.category === "dining" ? "MOBILE WALLET" : "POS";
     ledger.add("acc_card", date, -amount, merchant.name, merchant.category, "purchase",
-      `POS 4471 ${merchant.name.toUpperCase()} TORONTO ON`);
+      `${format} ${merchant.name.toUpperCase()} TORONTO ON`);
   }
   const day = Number(date.slice(8));
   if (day === 3) {
@@ -111,14 +117,14 @@ function generateEvents(ledger: Ledger, date: string) {
   const month = Number(date.slice(5, 7));
   const day = Number(date.slice(8));
   if (month === 12 && [6, 13, 20].includes(day)) {
-    ledger.add("acc_card", date, -14500, "Pinecone Gifts", "gifts_social", "purchase", "POS PINECONE GIFTS");
+    ledger.add("acc_card", date, -14500, "Pinecone Gifts", "gifts_social", "purchase", "POS PINECONE GIFTS OTTAWA ON");
     ledger.add("acc_card", date, -8500, "Hearth Dining", "dining", "purchase", "POS HEARTH DINING");
   }
   if (month === 7 && [4, 10, 15].includes(day)) {
     const names = ["Northshore Air", "Summit Haven Hotel", "Wandertrail Tours"];
     const amount = date.startsWith("2026") ? 70000 : 30000;
     const name = names[[4, 10, 15].indexOf(day)];
-    ledger.add("acc_card", date, -amount, name, "travel", "purchase", `TRAVEL ${name.toUpperCase()}`);
+    ledger.add("acc_card", date, -amount, name, "travel", "purchase", `TRAVEL ${name.toUpperCase()} HALIFAX NS`);
   }
   if (month === 4 && day === 15) ledger.add("acc_card", date, -58000, "Lakeshore Furniture Co.",
     "shopping", "purchase", "POS LAKESHORE FURNITURE");
@@ -134,12 +140,12 @@ function generateEvents(ledger: Ledger, date: string) {
 
 function generateInvesting(ledger: Ledger, date: string) {
   const day = Number(date.slice(8));
-  if (day === 12) ledger.pair(date, "acc_chequing", "acc_hisa", date === "2026-11-12" ? 530000 : 30000);
-  if (date === "2026-07-24") ledger.pair(date, "acc_hisa", "acc_chequing", 200000);
-  if (day === 14 && date < "2026-11-01") ledger.pair(date, "acc_chequing", "acc_tfsa", 180000);
+  if (day === 12) ledger.pair(date, "acc_chequing", "acc_hisa", 30000);
+  if (day === 14) ledger.pair(date, "acc_chequing", "acc_tfsa", 180000);
   if (day === 16) ledger.pair(date, "acc_chequing", "acc_rrsp", date.slice(5, 7) === "02" ? 180000 : 110000);
-  if (day === 18) {
-    const monthIndex = (Number(date.slice(0, 4)) - 2024) * 12 + Number(date.slice(5, 7)) - 11;
+  if ((day === 18 && date !== "2026-10-18") || date === "2026-11-14") {
+    const monthIndex = date === "2026-11-14" ? 23 :
+      (Number(date.slice(0, 4)) - 2024) * 12 + Number(date.slice(5, 7)) - 11;
     for (const holding of SEED_HOLDINGS) {
       const quantity = Math.floor(holding.quantity / 24) + (monthIndex < holding.quantity % 24 ? 1 : 0);
       if (quantity > 0 && monthIndex >= 0 && monthIndex < 24) {
@@ -172,18 +178,70 @@ function generatePrices(): Price[] {
       const dip = date <= "2026-06-12"
         ? daysBetween("2026-05-01", date) / 42
         : daysBetween(date, "2026-08-01") / 50;
-      factor -= 0.20 * dip;
+      factor -= 0.22 * dip;
     }
     return { ticker: security.ticker, date, close_cents: Math.round(security.as_of_close_cents * factor) };
   }));
 }
 
-function balanceLedger(ledger: Ledger) {
+function balanceCardCycle(ledger: Ledger) {
   const card = ledger.transactions.filter(item => item.account_id === "acc_card")
     .reduce((sum, item) => sum - item.amount_cents, 0);
-  const adjustment = 491238 - card;
-  if (adjustment > 0) ledger.add("acc_card", "2026-11-14", -adjustment, "Lakeshore Furniture Co.",
-    "shopping", "purchase", "POS LAKESHORE FURNITURE HOME ORDER");
+  let remainder = 491238 - card;
+  const purchases = ledger.transactions.filter(item => item.account_id === "acc_card" &&
+    item.kind === "purchase" && item.posted_on > "2026-10-24" &&
+    !item.id.startsWith("txn_planted") && item.category !== "subscriptions");
+  for (const [index, purchase] of purchases.entries()) {
+    const adjustment = Math.trunc(remainder / (purchases.length - index));
+    if (Math.abs(adjustment) > 4000 || purchase.amount_cents - adjustment >= 0) {
+      throw new Error("Card cycle cannot be balanced within purchase limits");
+    }
+    purchase.amount_cents -= adjustment;
+    remainder -= adjustment;
+  }
+  if (remainder !== 0) throw new Error("Card cycle has an unallocated remainder");
+}
+
+export function requiredTopUp(balance: number, amounts: number[]): number {
+  let projected = balance;
+  let minimum = Infinity;
+  for (const amount of amounts) {
+    projected += amount;
+    if (amount < 0) minimum = Math.min(minimum, projected);
+  }
+  return minimum < 30000 ? Math.ceil((30000 - minimum) / 50000) * 50000 : 0;
+}
+
+function savingsTopUps(ledger: Ledger) {
+  const daily = dates().map(date => ledger.transactions
+    .filter(item => item.account_id === "acc_chequing" && item.posted_on === date)
+    .sort((a, b) => a.id.localeCompare(b.id)));
+  const net = daily.flat().reduce((sum, item) => sum + item.amount_cents, 0);
+  const target = SEED_ACCOUNTS.find(account => account.id === "acc_chequing")!.balance_cents;
+  const baseline = target - net;
+  for (let opening = baseline; opening >= 0; opening -= 50000) {
+    let balance = opening;
+    const topUps: { date: string; amount: number }[] = [];
+    for (let index = 0; index < daily.length; index += 1) {
+      for (const transaction of daily[index]) balance += transaction.amount_cents;
+      if (index === daily.length - 1) continue;
+      const amount = requiredTopUp(balance, daily[index + 1].map(item => item.amount_cents));
+      if (amount > 0) {
+        balance += amount;
+        topUps.push({ date: addDays(HISTORY_START, index), amount });
+      }
+    }
+    if (balance === target) {
+      for (const topUp of topUps) {
+        ledger.pair(topUp.date, "acc_hisa", "acc_chequing", topUp.amount);
+      }
+      return;
+    }
+  }
+  throw new Error("Cannot reconcile need-based savings top-ups");
+}
+
+function balanceLedger(ledger: Ledger) {
   for (const date of dates().filter(item => item.endsWith("-28")).reverse()) {
     const later = ledger.transactions.filter(item => item.account_id === "acc_hisa" && item.posted_on > date)
       .reduce((sum, item) => sum + item.amount_cents, 0);
@@ -210,6 +268,8 @@ export function generateSeed(): SeedData {
     generateCardCycle(ledger, date);
   });
   ledger.transactions.push(...PLANTED_TRANSACTIONS.map(item => ({ ...item, transfer_group_id: null, action_id: null })));
+  balanceCardCycle(ledger);
+  savingsTopUps(ledger);
   const accounts = balanceLedger(ledger);
   return { accounts, transactions: ledger.transactions, holdings: SEED_HOLDINGS.map(item => ({ ...item })),
     bills: SEED_BILLS.map(item => ({ ...item })), contacts: SEED_CONTACTS.map(item => ({ ...item })),

@@ -1,12 +1,74 @@
 import { describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
-import { generateSeed } from "./generate";
+import { generateSeed, requiredTopUp } from "./generate";
 import { insertSeed, type Database } from "../seed";
 import { addDays, daysBetween, HISTORY_START, PERSONA, PLANTED_SUBSCRIPTION, PLANTED_TRANSACTIONS, SEED_ACCOUNTS, SEED_ANCHOR_DATE, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM, SEED_SECURITIES, TEMPLATE_SESSION_ID } from "../../src/contracts";
 
 const seed = generateSeed();
 describe("deterministic seed", () => {
+  it("keeps recent purchases plausible and has only the planted November sofa", () => {
+    const recent = seed.transactions.filter(t => t.kind === "purchase" &&
+      t.posted_on >= addDays(SEED_ANCHOR_DATE, -10) && !t.id.startsWith("txn_planted"));
+    expect(recent.every(t => -t.amount_cents <= 128900)).toBe(true);
+    const furniture = seed.transactions.filter(t => t.kind === "purchase" &&
+      t.merchant === "Lakeshore Furniture Co." && t.posted_on.startsWith(SEED_ANCHOR_DATE.slice(0, 7)));
+    expect(furniture).toHaveLength(1);
+    expect(furniture[0].id).toBe("txn_planted_furniture");
+  });
+  it("moves round savings amounts only when the next day's outflows need them", () => {
+    expect(requiredTopUp(80000, [-50001])).toBe(50000);
+    expect(requiredTopUp(80000, [-100001])).toBe(100000);
+    expect(requiredTopUp(80000, [-50000])).toBe(0);
+    expect(requiredTopUp(10000, [100000])).toBe(0);
+    const chequing = seed.accounts.find(a => a.id === "acc_chequing")!;
+    const rows = seed.transactions.filter(t => t.account_id === chequing.id);
+    let balance = chequing.opening_balance_cents;
+    const topUps = rows.filter(t => t.kind === "transfer_in" &&
+      seed.transactions.some(other => other.transfer_group_id === t.transfer_group_id && other.account_id === "acc_hisa"));
+    for (const row of rows) {
+      balance += row.amount_cents;
+      if (!topUps.includes(row)) continue;
+      expect(row.amount_cents % 50000).toBe(0);
+      let projected = balance - row.amount_cents;
+      let minimum = Infinity;
+      for (const next of rows.filter(t => t.posted_on === addDays(row.posted_on, 1))) {
+        projected += next.amount_cents;
+        if (next.amount_cents < 0) minimum = Math.min(minimum, projected);
+      }
+      expect(minimum, row.posted_on).toBeLessThan(30000);
+      expect(row.amount_cents).toBe(Math.ceil((30000 - minimum) / 50000) * 50000);
+    }
+  });
+  it("includes the anchor month's regular TFSA contribution", () => {
+    const contributions = seed.transactions.filter(t => t.account_id === "acc_tfsa" && t.kind === "transfer_in");
+    expect(contributions.find(t => t.posted_on === "2026-11-14")?.amount_cents).toBe(180000);
+  });
+  it("credits monthly savings interest on the balance before interest", () => {
+    const account = seed.accounts.find(a => a.id === "acc_hisa")!;
+    let balance = account.opening_balance_cents;
+    const rows = seed.transactions.filter(t => t.account_id === account.id);
+    const interest = rows.filter(t => t.kind === "interest");
+    expect(interest).toHaveLength(24);
+    for (const row of rows) {
+      if (row.kind === "interest") {
+        const expected = Math.round(balance * account.interest_rate_bps! / 120000);
+        expect(Math.abs(row.amount_cents - expected), row.posted_on).toBeLessThanOrEqual(1);
+      }
+      balance += row.amount_cents;
+    }
+  });
+  it("shows a 20 to 25 percent NRTH drawdown over about six weeks", () => {
+    const prices = seed.prices.filter(p => p.ticker === "NRTH.CX");
+    const peak = prices.find(p => p.date === "2026-05-01")!;
+    const trough = prices.find(p => p.date === "2026-06-12")!;
+    const decline = (peak.close_cents - trough.close_cents) / peak.close_cents;
+    expect(daysBetween(peak.date, trough.date)).toBe(42);
+    expect(decline).toBeGreaterThanOrEqual(0.20);
+    expect(decline).toBeLessThanOrEqual(0.25);
+    expect(prices.filter(p => p.date >= peak.date && p.date <= trough.date)
+      .every(p => p.close_cents <= peak.close_cents && p.close_cents >= trough.close_cents)).toBe(true);
+  });
   it("covers spending categories and limits merchant frequency", () => {
     const categories = ["housing", "groceries", "dining", "transport", "utilities", "phone_internet",
       "subscriptions", "shopping", "health_fitness", "travel", "entertainment", "insurance",
