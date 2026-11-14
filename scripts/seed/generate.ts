@@ -1,97 +1,218 @@
-import { addDays, daysBetween, HISTORY_START, SEED_ANCHOR_DATE, PERSONA, SEED_ACCOUNTS, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM, SEED_SECURITIES, PLANTED_TRANSACTIONS, PLANTED_SUBSCRIPTION, type Account, type AccountId, type Category, type Transaction, type Price, type Security } from "../../src/contracts";
+import {
+  addDays, daysBetween, HISTORY_START, SEED_ANCHOR_DATE, PERSONA,
+  SEED_ACCOUNTS, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM,
+  SEED_SECURITIES, PLANTED_TRANSACTIONS, PLANTED_SUBSCRIPTION,
+  type Account, type AccountId, type Category, type Transaction, type Price, type Security,
+} from "../../src/contracts";
 
 export type SeedData = {
-  accounts: Account[]; transactions: Transaction[]; holdings: typeof SEED_HOLDINGS;
-  bills: typeof SEED_BILLS; contacts: typeof SEED_CONTACTS; room: typeof SEED_ROOM;
-  securities: Security[]; prices: Price[];
+  accounts: Account[];
+  transactions: Transaction[];
+  holdings: typeof SEED_HOLDINGS;
+  bills: typeof SEED_BILLS;
+  contacts: typeof SEED_CONTACTS;
+  room: typeof SEED_ROOM;
+  securities: Security[];
+  prices: Price[];
 };
 
-// Fixed seed makes amounts repeatable while keeping the history varied.
-function randomSource() {
-  let state = 20261115;
-  return () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
+type Merchant = { name: string; category: Category; cents: number; interval: number; offset: number };
+const merchants: Merchant[] = [
+  { name: "Moss Market", category: "groceries", cents: 6800, interval: 7, offset: 0 },
+  { name: "Willow Pantry", category: "groceries", cents: 4500, interval: 10, offset: 2 },
+  { name: "Cedar Produce", category: "groceries", cents: 2400, interval: 14, offset: 3 },
+  { name: "Copper Spoon Cafe", category: "dining", cents: 850, interval: 4, offset: 0 },
+  { name: "Thimble Coffee", category: "dining", cents: 720, interval: 6, offset: 1 },
+  { name: "Paper Lantern Kitchen", category: "dining", cents: 4200, interval: 12, offset: 2 },
+  { name: "Juniper Table", category: "dining", cents: 5600, interval: 21, offset: 4 },
+  { name: "Pond Noodle House", category: "dining", cents: 3100, interval: 16, offset: 7 },
+  { name: "Cityline Transit", category: "transport", cents: 340, interval: 4, offset: 2 },
+  { name: "Swiftway Rides", category: "transport", cents: 2400, interval: 13, offset: 5 },
+  { name: "Cloudberry Goods", category: "shopping", cents: 4900, interval: 18, offset: 3 },
+  { name: "Birch Bookshop", category: "shopping", cents: 2900, interval: 30, offset: 8 },
+  { name: "Harbourfront Outfitters", category: "shopping", cents: 7200, interval: 35, offset: 10 },
+  { name: "Ridge Cinema", category: "entertainment", cents: 2300, interval: 30, offset: 1 },
+  { name: "Lantern Theatre", category: "entertainment", cents: 6200, interval: 90, offset: 7 },
+  { name: "Pine Pharmacy", category: "health_fitness", cents: 2600, interval: 30, offset: 4 },
+  { name: "Brightvale Dental", category: "health_fitness", cents: 18500, interval: 182, offset: 18 },
+  { name: "Riverbend Gifts", category: "gifts_social", cents: 4500, interval: 75, offset: 9 },
+  { name: "Northcrest Service", category: "fees", cents: 450, interval: 60, offset: 11 },
+];
+const subscriptions = [
+  ["Moonbeam Audio", 1299, 8], ["Pagehaven", 999, 11],
+  ["Cloudnest Storage", 399, 17], ["Framebox Films", 1499, 21],
+] as const;
+
+function dates(): string[] {
+  return Array.from({ length: daysBetween(HISTORY_START, SEED_ANCHOR_DATE) + 1 },
+    (_, index) => addDays(HISTORY_START, index));
 }
 
-const purchases: { merchant: string; category: Category; cents: number }[] = [
-  { merchant: "Moss Market", category: "groceries", cents: 4800 },
-  { merchant: "Copper Spoon Cafe", category: "dining", cents: 2100 },
-  { merchant: "Cityline Transit", category: "transport", cents: 700 },
-  { merchant: "Willow Pantry", category: "groceries", cents: 3600 },
-  { merchant: "Paper Lantern Kitchen", category: "dining", cents: 2900 },
-  { merchant: "Cloudberry Goods", category: "shopping", cents: 4100 },
-  { merchant: "Ridge Cinema", category: "entertainment", cents: 1800 },
-];
-
-export function generateSeed(): SeedData {
-  const random = randomSource();
+function createLedger() {
   const transactions: Transaction[] = [];
   let sequence = 0;
-  const add = (account_id: AccountId, posted_on: string, amount_cents: number, merchant: string, category: Category, kind: Transaction["kind"], description: string, transfer_group_id: string | null = null) => {
-    transactions.push({ id: `txn_${String(++sequence).padStart(6, "0")}`, account_id, posted_on, amount_cents, merchant, description, category, kind, transfer_group_id, action_id: null });
-  };
-  const pair = (date: string, destination: AccountId, cents: number, card = false) => {
-    const group = `move_${date}_${destination}`;
-    const label = card ? "bill_card - Rewards Credit Card" : `Transfer to ${destination}`;
-    add("acc_chequing", date, -cents, label, "transfers", card ? "card_payment_out" : "transfer_out", label, group);
-    add(destination, date, cents, card ? "bill_card - Rewards Credit Card" : "Transfer from chequing", "transfers", card ? "card_payment" : "transfer_in", card ? "Bill payment received: bill_card" : "Transfer from chequing", group);
-  };
-  for (let date = HISTORY_START; date <= SEED_ANCHOR_DATE; date = addDays(date, 1)) {
-    const day = Number(date.slice(8));
-    const month = Number(date.slice(5, 7));
-    if (daysBetween(PERSONA.pay.anchor_payday, date) % 14 === 0) add("acc_chequing", date, PERSONA.pay.net_cents, PERSONA.employer, "income", "income", "Payroll deposit");
-    // Two ordinary purchases per day, with modest deterministic variation.
-    for (let i = 0; i < 2; i++) {
-      const item = purchases[Math.floor(random() * purchases.length)];
-      add("acc_card", date, -Math.round(item.cents * (80 + Math.floor(random() * 41)) / 100), item.merchant, item.category, "purchase", `POS ${item.merchant}`);
-    }
-    if (day === 3) add("acc_card", date, -(date >= PLANTED_SUBSCRIPTION.first_new_charge ? PLANTED_SUBSCRIPTION.new_cents : PLANTED_SUBSCRIPTION.old_cents), PLANTED_SUBSCRIPTION.merchant, "subscriptions", "purchase", "Monthly subscription");
-    if (day === 8) add("acc_card", date, -1299, "Moonbeam Audio", "subscriptions", "purchase", "Monthly subscription");
-    for (const bill of SEED_BILLS.filter(b => b.saved && b.id !== "bill_card")) {
-      if (day === Number(bill.due_date.slice(8))) add("acc_chequing", date, -bill.amount_cents, bill.payee, bill.category, "bill_payment", `Bill payment ${bill.id}`);
-    }
-    if (day === 24) pair(date, "acc_card", 200000, true);
-    if (day === 12) pair(date, "acc_hisa", 170000);
-    if (day === 14) pair(date, "acc_tfsa", 50000);
-    if (day === 16) pair(date, "acc_rrsp", 50000);
-    if (day === 18) {
-      const group = `move_${date}_savings_investing`;
-      add("acc_hisa", date, -100000, "Transfer to investing", "transfers", "transfer_out", "Transfer to personal investing", group);
-      add("acc_nonreg", date, 100000, "Transfer from savings", "transfers", "transfer_in", "Transfer from savings", group);
-      add("acc_tfsa", date, -50000, "CAEQ.CX", "investments", "trade_buy", "Investment purchase");
-      add("acc_rrsp", date, -52000, "INTL.CX", "investments", "trade_buy", "Investment purchase");
-      add("acc_nonreg", date, -100000, "FERN.CX", "investments", "trade_buy", "Investment purchase");
-    }
-    if (day === 28) add("acc_hisa", date, 4200, "Coin Bank", "investments", "interest", "Monthly savings interest");
-    if (day === 20 && month % 3 === 0) {
-      for (const account of ["acc_tfsa", "acc_rrsp", "acc_nonreg"] as const) add(account, date, 7500, "CAEQ.CX", "investments", "dividend", "Quarterly distribution");
-      add("acc_chequing", date, -4500, "Sam Lee", "gifts_social", "etransfer_out", "E-transfer to saved contact ct_sam");
-    }
-    if (month === 7 && day === 18) add("acc_card", date, -90000, "Sunridge Getaways", "travel", "purchase", "Summer trip booking");
-    if (month === 12 && day === 12) add("acc_card", date, -28000, "Pinecone Gifts", "gifts_social", "purchase", "Holiday gifts");
+  function add(account_id: AccountId, posted_on: string, amount_cents: number,
+    merchant: string, category: Category, kind: Transaction["kind"], description: string,
+    transfer_group_id: string | null = null) {
+    sequence += 1;
+    transactions.push({ id: `txn_${String(sequence).padStart(6, "0")}`, account_id,
+      posted_on, amount_cents, merchant, category, kind, description, transfer_group_id, action_id: null });
   }
-  transactions.push(...PLANTED_TRANSACTIONS.map(t => ({ ...t, transfer_group_id: null, action_id: null })));
-  transactions.sort((a, b) => a.posted_on.localeCompare(b.posted_on) || a.id.localeCompare(b.id));
-  const accounts: Account[] = SEED_ACCOUNTS.map(a => {
-    const sum = transactions.filter(t => t.account_id === a.id).reduce((n, t) => n + t.amount_cents, 0);
-    return { ...a, institution_label: "Coin Bank", opening_balance_cents: a.balance_cents + (a.type === "credit_card" ? sum : -sum) };
-  });
-  const weekdays: string[] = [];
-  for (let date = HISTORY_START; date <= SEED_ANCHOR_DATE; date = addDays(date, 1)) {
-    const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-    if (weekday !== 0 && weekday !== 6) weekdays.push(date);
+  function pair(date: string, from: AccountId, to: AccountId, cents: number, card = false) {
+    const group = `move_${date}_${from}_${to}_${sequence}`;
+    const label = card ? "bill_card" : "ACCOUNT TRANSFER";
+    add(from, date, -cents, label, "transfers", card ? "card_payment_out" : "transfer_out", label, group);
+    add(to, date, cents, label, "transfers", card ? "card_payment" : "transfer_in", label, group);
   }
-  const prices: Price[] = [];
-  for (const security of SEED_SECURITIES) {
-    weekdays.forEach((date, i) => {
-      const progress = i / (weekdays.length - 1);
-      const start = security.ticker === "NRTH.CX" ? 0.5 : security.ticker === "BOND.CX" ? 1.01 : 0.83;
-      const drawdown = security.ticker === "NRTH.CX" ? 0.18 * Math.max(0, 1 - Math.abs(progress - 0.65) / 0.12) : 0;
-      const wave = 0.025 * Math.sin(progress * Math.PI * 8) * Math.sin(progress * Math.PI);
-      const factor = start + (1 - start) * progress - drawdown + wave;
-      prices.push({ ticker: security.ticker, date, close_cents: Math.round(security.as_of_close_cents * factor) });
-    });
+  return { transactions, add, pair };
+}
+type Ledger = ReturnType<typeof createLedger>;
+
+function generatePayAndBills(ledger: Ledger, date: string) {
+  const day = Number(date.slice(8));
+  if (daysBetween(PERSONA.pay.anchor_payday, date) % 14 === 0) {
+    ledger.add("acc_chequing", date, PERSONA.pay.net_cents, PERSONA.employer, "income", "income",
+      "PAYROLL DEP MAPLEWAVE STUDIO");
   }
-  return { accounts, transactions, holdings: SEED_HOLDINGS.map(h => ({ ...h })), bills: SEED_BILLS.map(b => ({ ...b })), contacts: SEED_CONTACTS.map(c => ({ ...c })), room: SEED_ROOM.map(r => ({ ...r })), securities: SEED_SECURITIES.map(s => ({ ticker: s.ticker, name: s.name, kind: s.kind, sector: s.sector, dividend_yield_bps: s.dividend_yield_bps })), prices };
+  for (const bill of SEED_BILLS.filter(item => item.saved && item.id !== "bill_card")) {
+    if (bill.id === "bill_gym" && date < "2026-01-01") continue;
+    if (day === Number(bill.due_date.slice(8))) {
+      ledger.add("acc_chequing", date, -bill.amount_cents, bill.payee, bill.category,
+        "bill_payment", `PREAUTH ${bill.payee.toUpperCase()}`);
+    }
+  }
 }
 
+function generateSpending(ledger: Ledger, date: string, index: number) {
+  for (const merchant of merchants) {
+    if (index % merchant.interval !== merchant.offset) continue;
+    const variation = 80 + (index * 17 + merchant.offset * 13) % 41;
+    const trend = merchant.category === "dining" && date >= "2026-08-01" ? 135 : 100;
+    const amount = Math.round(merchant.cents * variation * trend / 10000);
+    ledger.add("acc_card", date, -amount, merchant.name, merchant.category, "purchase",
+      `POS 4471 ${merchant.name.toUpperCase()} TORONTO ON`);
+  }
+  const day = Number(date.slice(8));
+  if (day === 3) {
+    const amount = date >= PLANTED_SUBSCRIPTION.first_new_charge
+      ? PLANTED_SUBSCRIPTION.new_cents : PLANTED_SUBSCRIPTION.old_cents;
+    ledger.add("acc_card", date, -amount, PLANTED_SUBSCRIPTION.merchant, "subscriptions",
+      "purchase", "RECURRING STREAMLY PREMIUM");
+  }
+  for (const [name, amount, chargeDay] of subscriptions) {
+    if (day === chargeDay) ledger.add("acc_card", date, -amount, name, "subscriptions",
+      "purchase", `RECURRING ${name.toUpperCase()}`);
+  }
+  if (day === 1) ledger.add("acc_card", date, -15600, "Cityline Pass", "transport",
+    "purchase", "MONTHLY CITYLINE PASS");
+}
 
+function generateEvents(ledger: Ledger, date: string) {
+  const month = Number(date.slice(5, 7));
+  const day = Number(date.slice(8));
+  if (month === 12 && [6, 13, 20].includes(day)) {
+    ledger.add("acc_card", date, -14500, "Pinecone Gifts", "gifts_social", "purchase", "POS PINECONE GIFTS");
+    ledger.add("acc_card", date, -8500, "Hearth Dining", "dining", "purchase", "POS HEARTH DINING");
+  }
+  if (month === 7 && [4, 10, 15].includes(day)) {
+    const names = ["Northshore Air", "Summit Haven Hotel", "Wandertrail Tours"];
+    const amount = date.startsWith("2026") ? 70000 : 30000;
+    const name = names[[4, 10, 15].indexOf(day)];
+    ledger.add("acc_card", date, -amount, name, "travel", "purchase", `TRAVEL ${name.toUpperCase()}`);
+  }
+  if (month === 4 && day === 15) ledger.add("acc_card", date, -58000, "Lakeshore Furniture Co.",
+    "shopping", "purchase", "POS LAKESHORE FURNITURE");
+  if (day === 20 && month % 2 === 0) {
+    const name = month % 4 === 0 ? "Priya Nair" : "Sam Lee";
+    ledger.add("acc_chequing", date, -4500, name, "gifts_social", "etransfer_out", `Interac e-Transfer to ${name}`);
+  }
+  if (day === 22 && month % 3 === 0) ledger.add("acc_chequing", date, 3200, "Marcus Bell",
+    "other", "etransfer_in", "Interac e-Transfer from Marcus Bell");
+  if (day === 20 && month % 4 === 0) ledger.add("acc_card", date, 2400, "Cloudberry Goods",
+    "shopping", "refund", "REFUND CLOUDBERRY GOODS");
+}
+
+function generateInvesting(ledger: Ledger, date: string) {
+  const day = Number(date.slice(8));
+  if (day === 12) ledger.pair(date, "acc_chequing", "acc_hisa", date === "2026-11-12" ? 530000 : 30000);
+  if (date === "2026-07-24") ledger.pair(date, "acc_hisa", "acc_chequing", 200000);
+  if (day === 14 && date < "2026-11-01") ledger.pair(date, "acc_chequing", "acc_tfsa", 180000);
+  if (day === 16) ledger.pair(date, "acc_chequing", "acc_rrsp", date.slice(5, 7) === "02" ? 180000 : 110000);
+  if (day === 18) {
+    const monthIndex = (Number(date.slice(0, 4)) - 2024) * 12 + Number(date.slice(5, 7)) - 11;
+    for (const holding of SEED_HOLDINGS) {
+      const quantity = Math.floor(holding.quantity / 24) + (monthIndex < holding.quantity % 24 ? 1 : 0);
+      if (quantity > 0 && monthIndex >= 0 && monthIndex < 24) {
+        ledger.add(holding.account_id, date, -quantity * holding.avg_cost_cents, holding.ticker,
+          "investments", "trade_buy", `BUY ${quantity} ${holding.ticker}`);
+      }
+    }
+  }
+  if (day === 20 && Number(date.slice(5, 7)) % 3 === 0) {
+    for (const account of ["acc_tfsa", "acc_rrsp", "acc_nonreg"] as const) {
+      ledger.add(account, date, 7500, "CAEQ.CX", "investments", "dividend", "QUARTERLY DISTRIBUTION");
+    }
+  }
+}
+
+function generateCardCycle(ledger: Ledger, date: string) {
+  if (!date.endsWith("-24")) return;
+  const cardTotal = ledger.transactions.filter(item => item.account_id === "acc_card")
+    .reduce((sum, item) => sum - item.amount_cents, 0);
+  if (cardTotal > 0) ledger.pair(date, "acc_chequing", "acc_card", cardTotal, true);
+}
+
+function generatePrices(): Price[] {
+  const weekdays = dates().filter(date => ![0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay()));
+  return SEED_SECURITIES.flatMap(security => weekdays.map((date, index) => {
+    const progress = index / (weekdays.length - 1);
+    const start = security.ticker === "NRTH.CX" ? 0.5 : security.ticker === "BOND.CX" ? 1.01 : 0.83;
+    let factor = start + (1 - start) * progress;
+    if (security.ticker === "NRTH.CX" && date >= "2026-05-01" && date <= "2026-08-01") {
+      const dip = date <= "2026-06-12"
+        ? daysBetween("2026-05-01", date) / 42
+        : daysBetween(date, "2026-08-01") / 50;
+      factor -= 0.20 * dip;
+    }
+    return { ticker: security.ticker, date, close_cents: Math.round(security.as_of_close_cents * factor) };
+  }));
+}
+
+function balanceLedger(ledger: Ledger) {
+  const card = ledger.transactions.filter(item => item.account_id === "acc_card")
+    .reduce((sum, item) => sum - item.amount_cents, 0);
+  const adjustment = 491238 - card;
+  if (adjustment > 0) ledger.add("acc_card", "2026-11-14", -adjustment, "Lakeshore Furniture Co.",
+    "shopping", "purchase", "POS LAKESHORE FURNITURE HOME ORDER");
+  for (const date of dates().filter(item => item.endsWith("-28")).reverse()) {
+    const later = ledger.transactions.filter(item => item.account_id === "acc_hisa" && item.posted_on > date)
+      .reduce((sum, item) => sum + item.amount_cents, 0);
+    const after = 2450000 - later;
+    const before = Math.round(after * 120000 / 120310);
+    ledger.add("acc_hisa", date, after - before, "Coin Bank", "investments", "interest", "SAVINGS INTEREST");
+  }
+  ledger.transactions.sort((a, b) => a.posted_on.localeCompare(b.posted_on) || a.id.localeCompare(b.id));
+  return SEED_ACCOUNTS.map(account => {
+    const sum = ledger.transactions.filter(item => item.account_id === account.id)
+      .reduce((total, item) => total + item.amount_cents, 0);
+    return { ...account, institution_label: "Coin Bank",
+      opening_balance_cents: account.balance_cents + (account.type === "credit_card" ? sum : -sum) };
+  });
+}
+
+export function generateSeed(): SeedData {
+  const ledger = createLedger();
+  dates().forEach((date, index) => {
+    generatePayAndBills(ledger, date);
+    generateSpending(ledger, date, index);
+    generateEvents(ledger, date);
+    generateInvesting(ledger, date);
+    generateCardCycle(ledger, date);
+  });
+  ledger.transactions.push(...PLANTED_TRANSACTIONS.map(item => ({ ...item, transfer_group_id: null, action_id: null })));
+  const accounts = balanceLedger(ledger);
+  return { accounts, transactions: ledger.transactions, holdings: SEED_HOLDINGS.map(item => ({ ...item })),
+    bills: SEED_BILLS.map(item => ({ ...item })), contacts: SEED_CONTACTS.map(item => ({ ...item })),
+    room: SEED_ROOM.map(item => ({ ...item })), securities: SEED_SECURITIES.map(({ ticker, name, kind, sector, dividend_yield_bps }) =>
+      ({ ticker, name, kind, sector, dividend_yield_bps })), prices: generatePrices() };
+}

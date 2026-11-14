@@ -7,6 +7,44 @@ import { addDays, daysBetween, HISTORY_START, PERSONA, PLANTED_SUBSCRIPTION, PLA
 
 const seed = generateSeed();
 describe("deterministic seed", () => {
+  it("covers spending categories and limits merchant frequency", () => {
+    const categories = ["housing", "groceries", "dining", "transport", "utilities", "phone_internet",
+      "subscriptions", "shopping", "health_fitness", "travel", "entertainment", "insurance",
+      "gifts_social", "fees"];
+    for (const category of categories) {
+      expect(seed.transactions.some(t => t.category === category && t.amount_cents < 0)).toBe(true);
+    }
+    const purchases = seed.transactions.filter(t => t.kind === "purchase");
+    for (const merchant of new Set(purchases.map(t => t.merchant))) {
+      expect(purchases.filter(t => t.merchant === merchant).length, merchant).toBeLessThanOrEqual(260);
+    }
+  });
+  it("shows holiday and summer spending spikes", () => {
+    const total = (month: string, category: string) => -seed.transactions
+      .filter(t => t.posted_on.startsWith(month) && t.category === category)
+      .reduce((sum, t) => sum + t.amount_cents, 0);
+    expect(total("2025-12", "gifts_social")).toBeGreaterThan(total("2025-11", "gifts_social"));
+    expect(total("2025-12", "dining")).toBeGreaterThan(total("2025-11", "dining"));
+    expect(total("2026-07", "travel")).toBeGreaterThan(total("2026-06", "travel"));
+    expect(total("2026-07", "travel")).toBeGreaterThan(total("2026-08", "travel"));
+  });
+  it("pays each card balance in full, leaving the anchor statement unpaid", () => {
+    const card = seed.accounts.find(a => a.id === "acc_card")!;
+    let owed = card.opening_balance_cents;
+    for (const transaction of seed.transactions.filter(t => t.account_id === card.id)) {
+      owed -= transaction.amount_cents;
+      if (transaction.kind === "card_payment") expect(owed, transaction.posted_on).toBe(0);
+    }
+    expect(owed).toBe(card.statement_balance_cents);
+    expect(seed.transactions.filter(t => t.kind === "card_payment").at(-1)?.posted_on).toBe("2026-10-24");
+  });
+  it("changes only the planted subscription price", () => {
+    const subscriptions = seed.transactions.filter(t => t.category === "subscriptions" && t.kind === "purchase");
+    for (const merchant of new Set(subscriptions.map(t => t.merchant))) {
+      const amounts = new Set(subscriptions.filter(t => t.merchant === merchant).map(t => t.amount_cents));
+      expect(amounts.size, merchant).toBe(merchant === PLANTED_SUBSCRIPTION.merchant ? 2 : 1);
+    }
+  });
   it("matches pinned facts and planted rows", () => {
     for (const pinned of SEED_ACCOUNTS) expect(seed.accounts.find(a => a.id === pinned.id)).toMatchObject(pinned);
     expect(seed.bills).toEqual(SEED_BILLS); expect(seed.contacts).toEqual(SEED_CONTACTS);
@@ -25,7 +63,7 @@ describe("deterministic seed", () => {
       let balance = account.opening_balance_cents; expect(balance, account.id).toBeGreaterThanOrEqual(0);
       for (const t of seed.transactions.filter(t => t.account_id === account.id)) {
         balance += account.type === "credit_card" ? -t.amount_cents : t.amount_cents;
-        if (account.type !== "credit_card") expect(balance, `${t.posted_on} ${t.id}`).toBeGreaterThanOrEqual(0);
+        if (account.type !== "credit_card") expect(balance, `${account.id} ${t.posted_on} ${t.id}`).toBeGreaterThanOrEqual(0);
         if (account.id === "acc_card") { expect(balance, `${t.posted_on} ${t.id}`).toBeLessThanOrEqual(account.limit_cents!); expect(balance, `${t.posted_on} ${t.id}`).toBeGreaterThanOrEqual(0); }
       }
       expect(balance).toBe(account.balance_cents);
