@@ -2,7 +2,7 @@ import { addDays, dollarsToCents, ToolInputs, UNTRUSTED_NOTE, type ToolName } fr
 import type { Tx } from "../db/types";
 import { AppError } from "../errors";
 import * as q from "../db/queries";
-import { cashflow, clampToHistory, holdingViews, portfolioSeries, spending, tickerWeights } from "./data";
+import { cashflow, clampToHistory, holdingViews, portfolioSeries, spending } from "./data";
 import { checkAffordability } from "./affordability";
 import { recurringChanges } from "./recurring";
 
@@ -72,11 +72,8 @@ export async function runReadTool(db: Tx, sid: string, name: ReadName, input: un
     case "get_holdings": {
       const p = ToolInputs.get_holdings.parse(input);
       const all = await holdingViews(db, sid);
-      const weights = tickerWeights(all);
-      // A ticker held in two accounts is one concentration: report its combined weight too.
-      return all
-        .filter(h => !p.account_id || h.account_id === p.account_id)
-        .map(h => ({ ...h, ticker_weight_of_portfolio: weights.get(h.ticker) ?? 0 }));
+      // Each row already carries ticker_weight_of_portfolio (combined across accounts).
+      return all.filter(h => !p.account_id || h.account_id === p.account_id);
     }
     case "get_portfolio_performance": {
       const p = ToolInputs.get_portfolio_performance.parse(input);
