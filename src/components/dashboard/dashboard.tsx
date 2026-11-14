@@ -1,22 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AccountView, ChartPayload } from "../../contracts";
+import type { AccountView } from "../../contracts";
 import { api, unwrap, type AccountDetailPayload, type DashboardPayload } from "../../lib/api";
 import { money, signedMoney } from "../../lib/format";
 import { ChartCard } from "../charts/chart-card";
 import { AccountList, BalanceHero, TransactionList, UpcomingStrip } from "./pieces";
-
-/** Net-worth change since the first point of the current month in the chart. */
-function monthChange(chart: ChartPayload, today: string): number | null {
-  const valueKey = chart.series[0]?.key ?? "value";
-  const monthStart = `${today.slice(0, 7)}-01`;
-  const points = chart.data.filter((row) => String(row[chart.x.key]) >= monthStart);
-  const first = points[0]?.[valueKey];
-  const last = chart.data.at(-1)?.[valueKey];
-  if (typeof first !== "number" || typeof last !== "number") return null;
-  return last - first;
-}
 
 function Loading() {
   return (
@@ -31,7 +20,7 @@ function Loading() {
 function Overview({ data, onOpen }: { data: DashboardPayload; onOpen: (account: AccountView) => void }) {
   return (
     <div className="space-y-8">
-      <BalanceHero accounts={data.accounts} monthChange={monthChange(data.net_worth, data.today)} />
+      <BalanceHero accounts={data.accounts} monthChange={data.month_change_cents} />
       <UpcomingStrip events={unwrap(data.upcoming)} today={data.today} />
       <div className="grid gap-8 xl:grid-cols-[1fr_1fr]">
         <AccountList accounts={data.accounts} today={data.today} onOpen={onOpen} />
@@ -83,15 +72,29 @@ function HoldingsTable({ holdings }: { holdings: NonNullable<AccountDetailPayloa
 
 function AccountDetail({ accountId, refreshKey, onBack }: { accountId: string; refreshKey: number; onBack: () => void }) {
   const [detail, setDetail] = useState<AccountDetailPayload | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    api.account(accountId).then((payload) => !cancelled && setDetail(payload));
+    api
+      .account(accountId)
+      .then((payload) => !cancelled && setDetail(payload))
+      .catch(() => !cancelled && setFailed(true));
     return () => {
       cancelled = true;
     };
   }, [accountId, refreshKey]);
 
+  if (failed && !detail) {
+    return (
+      <div className="space-y-4">
+        <button type="button" onClick={onBack} className="text-sm font-extrabold text-accent hover:underline">
+          &larr; All accounts
+        </button>
+        <p className="font-semibold text-muted">This account didn&rsquo;t load. Refresh the page to try again.</p>
+      </div>
+    );
+  }
   if (!detail) return <Loading />;
   const { account } = detail;
 
@@ -141,7 +144,8 @@ export function Dashboard({
     };
   }, [refreshKey]);
 
-  if (failed) {
+  // A failed refresh keeps showing what already loaded.
+  if (failed && !data) {
     return <p className="font-semibold text-muted">Your accounts didn&rsquo;t load. Refresh the page to try again.</p>;
   }
   if (openAccountId) {

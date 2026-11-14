@@ -1,7 +1,8 @@
 import {
   ACCOUNT_ALIASES, ActionType, CARD_BILL_ID, INVESTMENT_ACCOUNT_TYPES, PAYMENT_SOURCE_TYPES,
-  RULE_MESSAGES, RULE_MESSAGE_VARIANTS, TRANSFER_MATRIX,
-  type CheckOutcome, type CheckResult, type EvaluateRules, type Proposal, type RuleContext, type RuleId,
+  RULE_MESSAGES, RULE_MESSAGE_VARIANTS, SEED_SECURITIES, TRANSFER_MATRIX,
+  type CheckOutcome, type CheckResult, type EvaluateRules, type Proposal, type RequestEntities,
+  type RuleContext, type RuleId,
 } from "../../contracts";
 import { extractRequestEntities } from "./extract";
 
@@ -105,12 +106,20 @@ function nameMatches(text: string, name: string): boolean {
   return parts.length > 0 && parts.every((part) => word(text, part));
 }
 
-function savedBillAmount(proposal: Proposal, ctx: RuleContext, amounts: number[]): boolean {
+/**
+ * "Pay my hydro bill": no amount typed, so the bill's own amount is the one
+ * asked for. Whether the payee is saved is rule 2's question, not this one's,
+ * so an unsaved bill is blocked for the right reason.
+ */
+function billAmountAsListed(proposal: Proposal, ctx: RuleContext, amounts: number[]): boolean {
   if (proposal.type !== "bill_payment" || proposal.bill_id === CARD_BILL_ID) {
     return false;
   }
-  return amounts.length === 0 && billNamed(proposal, ctx) && ctx.bills.some((bill) =>
-    bill.id === proposal.bill_id && bill.saved && bill.amount_cents === proposal.amount_cents);
+  if (amounts.length > 0 || !billNamed(proposal, ctx)) {
+    return false;
+  }
+  return ctx.bills.some((bill) =>
+    bill.id === proposal.bill_id && bill.amount_cents === proposal.amount_cents);
 }
 
 function confirmedEmail(proposal: Etransfer, ctx: RuleContext, emails: string[]): boolean {
@@ -132,7 +141,7 @@ function rule0Intent(proposal: Proposal, ctx: RuleContext): Result {
   if (proposal.type !== "trade") {
     const amountMatches = entities.amounts_cents.includes(proposal.amount_cents);
     const fullMatches = entities.full_amount && fullValue(proposal, ctx) === proposal.amount_cents;
-    if (!amountMatches && !fullMatches && !savedBillAmount(proposal, ctx, entities.amounts_cents)) {
+    if (!amountMatches && !fullMatches && !billAmountAsListed(proposal, ctx, entities.amounts_cents)) {
       return fail(rule);
     }
   }
@@ -280,16 +289,80 @@ function rule7TradeLimits(proposal: Proposal, ctx: RuleContext): Result {
   return fail(rule, { values: { n: String(max), ticker: proposal.ticker }, quantity: max, variant });
 }
 
-function tradeMatches(proposal: Trade, entities: ReturnType<typeof extractRequestEntities>): boolean {
-  const amountMismatch = entities.amounts_cents.some((amount) => {
-    if (proposal.side === "buy" && proposal.price_cents > 0) {
-      return proposal.quantity !== Math.floor(amount / proposal.price_cents);
-    }
-    return amount !== proposal.quantity * proposal.price_cents;
-  });
-  return !amountMismatch && !entities.tickers.some((ticker) => ticker !== proposal.ticker)
-    && !entities.quantities.some((quantity) => quantity !== proposal.quantity)
-    && (!entities.side || entities.side === proposal.side);
+// Words too common across security names to identify one of them.
+const GENERIC_NAME_WORDS = new Set(["etf", "index", "equity", "market"]);
+// "Sell all my NRTH.CX": the whole position, so the share count needs no number.
+const WHOLE_POSITION = /\b(?:all|everything|entire|whole)\b/i;
+
+function nameWordAppears(text: string, nameWord: string): boolean {
+  const isAcronym = nameWord === nameWord.toUpperCase();
+  if (isAcronym) {
+    // "US" must be typed in capitals, so the pronoun "us" never names a fund.
+    return new RegExp("(?<![\\w])" + nameWord + "(?![\\w])").test(text);
+  }
+  return nameWord.length >= 4 && word(text, nameWord);
+}
+
+/**
+ * True when the user's own words name this security: its ticker ("NRTH.CX" or
+ * "NRTH") or a distinctive word of its name ("Northwind"). Names come from the
+ * fixed security list, never from text the model read.
+ */
+function tickerNamed(ticker: string, text: string): boolean {
+  const shortTicker = ticker.replace(/\.CX$/, "");
+  if (word(text, ticker) || word(text, shortTicker)) {
+    return true;
+  }
+  const security = SEED_SECURITIES.find((item) => item.ticker === ticker);
+  if (!security) {
+    return false;
+  }
+  const nameWords = security.name.split(/\s+/)
+    .filter((part) => !GENERIC_NAME_WORDS.has(part.toLowerCase()));
+  return nameWords.some((part) => nameWordAppears(text, part));
+}
+
+/** A dollar figure in a trade request is a budget: the most whole shares it covers. */
+function sharesForBudget(budgetCents: number, priceCents: number): number {
+  return priceCents > 0 ? Math.floor(budgetCents / priceCents) : 0;
+}
+
+function sellsWholePosition(proposal: Trade, ctx: RuleContext): boolean {
+  if (proposal.side !== "sell" || !WHOLE_POSITION.test(ctx.user_message.text)) {
+    return false;
+  }
+  const holding = ctx.holdings.find((item) =>
+    item.account_id === proposal.account_id && item.ticker === proposal.ticker);
+  return holding !== undefined && holding.quantity === proposal.quantity;
+}
+
+/**
+ * A trade matches the request when the user named the security, said how much
+ * (a share count, a dollar budget, or "all" of a position), and nothing they
+ * typed disagrees with the proposal. Without this a trade's ticker and size
+ * would be the model's choice, which text planted in the data could steer.
+ */
+function tradeMatches(proposal: Trade, entities: RequestEntities, ctx: RuleContext): boolean {
+  if (!tickerNamed(proposal.ticker, ctx.user_message.text)) {
+    return false;
+  }
+  const gaveShares = entities.quantities.length > 0;
+  const gaveBudget = entities.amounts_cents.length > 0;
+  if (!gaveShares && !gaveBudget && !sellsWholePosition(proposal, ctx)) {
+    return false;
+  }
+  if (entities.quantities.some((quantity) => quantity !== proposal.quantity)) {
+    return false;
+  }
+  const budgetDisagrees = entities.amounts_cents.some((budget) =>
+    sharesForBudget(budget, proposal.price_cents) !== proposal.quantity);
+  if (budgetDisagrees) {
+    return false;
+  }
+  if (entities.tickers.some((ticker) => ticker !== proposal.ticker)) {
+    return false;
+  }
+  return entities.side === null || entities.side === proposal.side;
 }
 
 function recipientMatches(proposal: Etransfer, ctx: RuleContext): boolean {
@@ -345,7 +418,7 @@ function rule8MatchesRequest(proposal: Proposal, ctx: RuleContext): Result {
   if (proposal.type !== "trade" && entities.amounts_cents.some((a) => a !== proposal.amount_cents)) {
     return fail(rule);
   }
-  if (proposal.type === "trade" && !tradeMatches(proposal, entities)) {
+  if (proposal.type === "trade" && !tradeMatches(proposal, entities, ctx)) {
     return fail(rule);
   }
   if (proposal.type === "etransfer" && !recipientMatches(proposal, ctx)) {
@@ -362,29 +435,60 @@ function rule8MatchesRequest(proposal: Proposal, ctx: RuleContext): Result {
   return pass(rule);
 }
 
+/**
+ * The amount Coin offers instead ("Use $2,340.12 instead"): the smallest limit
+ * among the failed checks. Offered only when every failure is an amount limit;
+ * if anything else failed too, a smaller amount would not fix it.
+ */
+function largestPassingAmount(failures: Result[]): number | null {
+  const limits: number[] = [];
+  for (const failure of failures) {
+    if (!failure.amountFailure || failure.max_passing_amount_cents === null) {
+      return null;
+    }
+    limits.push(failure.max_passing_amount_cents);
+  }
+  return limits.length > 0 ? Math.min(...limits) : null;
+}
+
+function largestPassingQuantity(failures: Result[]): number | null {
+  const limits = failures
+    .map((failure) => failure.max_passing_quantity)
+    .filter((quantity): quantity is number => quantity !== null);
+  return limits.length > 0 ? Math.min(...limits) : null;
+}
+
+/** Drops the engine's internal bookkeeping so the result is exactly a CheckResult. */
+function toCheckResult(result: Result): CheckResult {
+  const { rule, outcome, message, max_passing_amount_cents, max_passing_quantity } = result;
+  return { rule, outcome, message, max_passing_amount_cents, max_passing_quantity };
+}
+
+/**
+ * All nine rules, always, in order. Pure: it reads only the proposal and the
+ * context snapshot, so the same call gives the same verdict when the action is
+ * proposed, when it is approved, and again inside the executor's transaction.
+ */
 export const evaluateRules: EvaluateRules = (proposal, ctx) => {
+  const newRecipient = rule3NewRecipient(proposal, ctx);
   const checks = [
-    rule0Intent(proposal, ctx), rule1AllowedAction(proposal, ctx), rule2SavedPayee(proposal, ctx),
-    rule3NewRecipient(proposal, ctx), rule4EnoughMoney(proposal, ctx), rule5DailyLimit(proposal, ctx),
-    rule6ContributionRoom(proposal, ctx), rule7TradeLimits(proposal, ctx),
+    rule0Intent(proposal, ctx),
+    rule1AllowedAction(proposal, ctx),
+    rule2SavedPayee(proposal, ctx),
+    newRecipient,
+    rule4EnoughMoney(proposal, ctx),
+    rule5DailyLimit(proposal, ctx),
+    rule6ContributionRoom(proposal, ctx),
+    rule7TradeLimits(proposal, ctx),
     rule8MatchesRequest(proposal, ctx),
   ];
   const failures = checks.filter((check) => check.outcome === "fail");
-  let amountMax: number | null = null;
-  if (failures.length && failures.every((check) => check.amountFailure
-    && check.max_passing_amount_cents !== null)) {
-    amountMax = Math.min(...failures.map((check) => check.max_passing_amount_cents!));
-  }
-  const quantities = failures.map((check) => check.max_passing_quantity)
-    .filter((quantity): quantity is number => quantity !== null);
   return {
     allowed: failures.length === 0,
-    checks: checks.map(({ rule, outcome, message, max_passing_amount_cents, max_passing_quantity }) => ({
-      rule, outcome, message, max_passing_amount_cents, max_passing_quantity,
-    })),
-    requires_second_confirmation: checks[3].outcome === "flag",
-    max_passing_amount_cents: amountMax,
-    max_passing_quantity: quantities.length ? Math.min(...quantities) : null,
+    checks: checks.map(toCheckResult),
+    requires_second_confirmation: newRecipient.outcome === "flag",
+    max_passing_amount_cents: largestPassingAmount(failures),
+    max_passing_quantity: largestPassingQuantity(failures),
     primary_message: failures[0]?.message ?? null,
   };
 };

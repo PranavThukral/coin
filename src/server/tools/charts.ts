@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { addDays, ChartRequest, type ChartPayload, type ChartSource } from "../../contracts";
 import type { Tx } from "../db/types";
 import * as q from "../db/queries";
-import { cashflow, holdingViews, portfolioSeries, spending } from "./data";
+import { AppError } from "../errors";
+import { cashflow, clampToHistory, holdingViews, portfolioSeries, spending } from "./data";
 
 type Context = { db: Tx; sid: string; req: ChartRequest; today: string; from: string; to: string };
 type Result = Pick<ChartPayload, "data"> &
@@ -86,7 +87,7 @@ async function portfolioValue({ db, sid, req, from, to }: Context): Promise<Resu
 }
 
 async function priceHistory({ db, sid, req, from, to }: Context): Promise<Result> {
-  if (!req.ticker) throw new Error("Ticker required");
+  if (!req.ticker) throw new AppError("invalid", "price_history needs a ticker.");
   const rows = (await q.prices(db, sid))
     .filter(p => p.ticker === req.ticker && p.date >= from && p.date <= to);
   return { data: rows.map(row => ({ x: row.date, value: row.close_cents })) };
@@ -104,7 +105,7 @@ async function upcomingCashflow({ db, sid, req, today }: Context): Promise<Resul
 
 async function balanceHistory(context: Context, netWorth: boolean): Promise<Result> {
   const { db, sid, req, from, to } = context;
-  if (!netWorth && !req.account_id) throw new Error("Account required");
+  if (!netWorth && !req.account_id) throw new AppError("invalid", "account_balance_over_time needs an account_id.");
   const [accounts, tx, series] = await Promise.all([
     q.accounts(db, sid), q.transactions(db, sid), portfolioSeries(db, sid, from, to, null, "month"),
   ]);
@@ -149,8 +150,8 @@ export async function buildChart(db: Tx, sid: string, request: ChartRequest): Pr
   const req = ChartRequest.parse(request);
   const today = (await q.sessionInfo(db, sid)).today_date;
   const monthly = ["spending_by_category", "top_merchants", "category_change"].includes(req.source);
-  const from = req.from ?? (monthly ? `${today.slice(0, 7)}-01` : addDays(today, -365));
-  const to = req.to ?? today;
+  const from = clampToHistory(req.from ?? (monthly ? `${today.slice(0, 7)}-01` : addDays(today, -365)), today);
+  const to = clampToHistory(req.to ?? today, today);
   const result = await CHART_BUILDERS[req.source]({ db, sid, req, today, from, to });
   return {
     id: randomUUID(), source: req.source, kind: req.kind ?? result.kind ?? "line", title: req.title,

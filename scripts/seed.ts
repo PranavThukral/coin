@@ -1,4 +1,4 @@
-import "dotenv/config";
+import { loadScriptEnv } from "./env";
 import postgres from "postgres";
 import { resolve } from "node:path";
 import { generateSeed, type SeedData } from "./seed/generate";
@@ -46,6 +46,7 @@ export async function seedDatabase(url: string): Promise<void> {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve("scripts/seed.ts")) {
+  loadScriptEnv();
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
   seedDatabase(process.env.DATABASE_URL).catch(error => { console.error(error); process.exitCode = 1; });
 }

@@ -1,5 +1,5 @@
 import {
-  ACCOUNT_ALIASES, FULL_AMOUNT_PHRASES, INTENT_VERBS, SEED_CONTACTS,
+  ACCOUNT_ALIASES, FULL_AMOUNT_PHRASES, INTENT_VERBS, SEED_CONTACTS, SEED_SECURITIES,
   type AccountId, type ExtractRequestEntities,
 } from "../../contracts";
 
@@ -9,8 +9,13 @@ const EMAIL = /[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi;
 const TICKER = /\b[A-Z]{3,5}\.CX\b/gi;
 // Dates are not amounts.
 const DATE = /\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b|\b\d{1,2}[-/]\d{1,2}(?:[-/]\d{2,4})?\b/g;
-// Share counts are quantities, not amounts.
-const QUANTITY = /\b(\d+)\s+shares?\b/gi;
+// Share counts are quantities, not amounts: "10 shares", "10 NRTH.CX", "10 NRTH".
+// A number with a dollar sign or a decimal point is money, never a share count.
+const SHORT_TICKERS = SEED_SECURITIES.map((security) => security.ticker.replace(".CX", "")).join("|");
+const QUANTITY = new RegExp(
+  "(?<![$\\w.,])(\\d[\\d,]*)\\s+(?:shares?|units?|[a-z]{3,5}\\.CX|(?:" + SHORT_TICKERS + "))(?![\\w])",
+  "gi",
+);
 // Amounts can include commas, decimals, and a thousands suffix.
 const AMOUNT = /(?<![\w.])\$?\d[\d,]*(?:\.\d{1,2})?\s*k?(?![\w]|\.\d)/gi;
 // Capitalized words can be names.
@@ -62,8 +67,9 @@ export function normalizeText(text: string): string {
 }
 
 function findAmounts(text: string): number[] {
-  const masked = text.replace(EMAIL, " ").replace(TICKER, " ")
-    .replace(DATE, " ").replace(QUANTITY, " ");
+  // Share counts go first: "10 NRTH.CX" must be read whole, before tickers are removed.
+  const masked = text.replace(EMAIL, " ").replace(DATE, " ")
+    .replace(QUANTITY, " ").replace(TICKER, " ");
   return [...masked.matchAll(AMOUNT)].map((match) => {
     const raw = match[0].replace(/[$,\s]/g, "").toLowerCase();
     const thousands = raw.endsWith("k");
@@ -119,7 +125,7 @@ function findTickers(text: string): string[] {
 }
 
 function findQuantities(text: string): number[] {
-  return [...text.matchAll(QUANTITY)].map((match) => Number(match[1]));
+  return [...text.matchAll(QUANTITY)].map((match) => Number(match[1].replace(/,/g, "")));
 }
 
 function readIntent(text: string): boolean {

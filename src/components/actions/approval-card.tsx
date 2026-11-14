@@ -73,10 +73,36 @@ function ExecutedBadge() {
 /** "... I can do up to $X." / "Up to $X.": dropped when the card offers that amount as a button. */
 const OFFER_SENTENCE = /\s*(I can do up|Up) to \$[\d,]+(\.\d{2})?\.?\s*$/;
 
+const UNREADABLE_REQUEST = "Coin's request was incomplete, so there is nothing to approve. Ask again.";
+
+/** Why a card is blocked when no single check failed: Coin's request couldn't be read, or settling it went wrong. */
+function blockedReasonOf(card: ActionCard): string {
+  if (card.amount_cents === null) return UNREADABLE_REQUEST;
+  return card.primary_message ?? "Blocked when it was checked again. Nothing moved.";
+}
+
 /** Only what broke or needs attention. When nothing did, one quiet line. */
-function CheckList({ checks, offersAmount }: { checks: CheckResult[]; offersAmount: boolean }) {
+function CheckList({
+  checks,
+  offersAmount,
+  blockedReason,
+}: {
+  checks: CheckResult[];
+  offersAmount: boolean;
+  blockedReason: string | null;
+}) {
   const problems = checks.filter((c) => c.outcome === "fail" || c.outcome === "flag");
 
+  if (problems.length === 0 && blockedReason) {
+    return (
+      <p className="mt-4 flex items-start gap-2 border-t border-border pt-3 text-sm font-semibold text-blocked">
+        <span className="mt-0.5">
+          <CrossIcon />
+        </span>
+        <span>{blockedReason}</span>
+      </p>
+    );
+  }
   if (problems.length === 0) {
     return (
       <p className="mt-4 flex items-center gap-2 border-t border-border pt-3 text-sm font-semibold text-subtle">
@@ -162,7 +188,7 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
 }
 
 function Amount({ card, state }: { card: ActionCard; state: CardState }) {
-  const value = card.amount_cents !== null ? money(card.amount_cents) : "—";
+  const value = card.amount_cents !== null ? money(card.amount_cents) : "\u2014";
   if (state === "cancelled") {
     return <p className="money mt-3 inline-block text-3xl font-extrabold tracking-tight text-subtle coin-struck">{value}</p>;
   }
@@ -213,16 +239,22 @@ export function ApprovalCard({
       </div>
 
       <Amount card={card} state={state} />
-      <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-muted">
-        {card.from_label}
-        <ArrowIcon />
-        {card.to_label}
-      </p>
+      {(card.from_label || card.to_label) && (
+        <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-muted">
+          {card.from_label}
+          <ArrowIcon />
+          {card.to_label}
+        </p>
+      )}
       <Outcome card={card} state={state} />
 
       {state === "confirm" && <RecipientConfirmation name={recipientName} onEmail={setEmail} />}
       {showChecks && (
-        <CheckList checks={card.checks} offersAmount={state === "blocked" && card.max_passing_amount_cents !== null} />
+        <CheckList
+          checks={card.checks}
+          offersAmount={state === "blocked" && card.max_passing_amount_cents !== null}
+          blockedReason={state === "blocked" ? blockedReasonOf(card) : null}
+        />
       )}
       {error && <p className="mt-3 text-sm font-bold text-loss">{error}</p>}
 

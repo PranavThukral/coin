@@ -33,6 +33,8 @@ export interface DashboardPayload {
   recent_transactions: Wrapped<Transaction[]>;
   upcoming: Wrapped<UpcomingEvent[]>;
   net_worth: ChartPayload;
+  /** Net worth now minus net worth at the end of last month. */
+  month_change_cents: number | null;
   daily_outflow: DailyOutflow;
 }
 
