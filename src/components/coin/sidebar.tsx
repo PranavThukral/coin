@@ -161,7 +161,7 @@ export function CoinSidebar({
         <div className="min-w-0 flex-1">
           <p className="font-extrabold leading-tight">Coin</p>
           <p className="truncate text-xs font-bold text-pending" aria-live="polite">
-            {chat.status ?? " "}
+            {chat.status ?? "\u00a0"}
           </p>
         </div>
         <button

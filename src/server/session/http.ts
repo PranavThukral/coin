@@ -77,14 +77,19 @@ export async function withSession(
   request: Request,
   handler: (context: SessionContext) => Promise<Response>,
 ): Promise<Response> {
+  // Request data is read first, outside the try block. That tells Next.js this
+  // route can only run per request, so a build never prerenders (and caches)
+  // an API response, whatever the environment looks like at build time.
+  const cookieValue = readCookie(request, SESSION.cookie_name);
+  const ip = clientIp(request);
   const now = new Date();
   let cookie: string | null = null;
   let response: Response;
 
   try {
     const db = database();
-    const ipHash = hashIp(clientIp(request), process.env.IP_HASH_SALT ?? "");
-    const session = await resolveSession(db, readCookie(request, SESSION.cookie_name), now, ipHash);
+    const ipHash = hashIp(ip, process.env.IP_HASH_SALT ?? "");
+    const session = await resolveSession(db, cookieValue, now, ipHash);
     // Refresh on every response: the browser's expiry slides with activity,
     // matching the server's idle window.
     cookie = sessionCookie(session.sessionId, isHttps(request));

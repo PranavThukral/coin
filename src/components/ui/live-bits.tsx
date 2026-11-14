@@ -16,25 +16,39 @@ function secondsUntil(executeAt: number, now: number): number {
  * The undo ring. With `executeAt` (ISO time from the server) it counts down to
  * that moment and calls `onElapsed` once at zero; without it, it runs a fresh
  * 60 seconds (the design preview).
+ *
+ * The clock is only read after mount: reading it while rendering would bake
+ * one moment into the prerendered page (and fails the production build).
  */
 export function UndoRing({ executeAt, onElapsed }: { executeAt?: string | null; onElapsed?: () => void }) {
-  const [target] = useState(() => (executeAt ? Date.parse(executeAt) : Date.now() + WINDOW_SECONDS * 1000));
-  const [now, setNow] = useState(() => Date.now());
+  const [clock, setClock] = useState<{ mountedAt: number; now: number } | null>(null);
   const fired = useRef(false);
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
+    const tick = () => {
+      const now = Date.now();
+      setClock((current) => ({ mountedAt: current?.mountedAt ?? now, now }));
+    };
+    const frame = requestAnimationFrame(tick);
+    const timer = setInterval(tick, 250);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearInterval(timer);
+    };
   }, []);
 
-  const secondsLeft = secondsUntil(target, now);
+  let secondsLeft = WINDOW_SECONDS;
+  if (clock) {
+    const target = executeAt ? Date.parse(executeAt) : clock.mountedAt + WINDOW_SECONDS * 1000;
+    secondsLeft = secondsUntil(target, clock.now);
+  }
 
   useEffect(() => {
-    if (secondsLeft === 0 && !fired.current) {
+    if (clock && secondsLeft === 0 && !fired.current) {
       fired.current = true;
       onElapsed?.();
     }
-  }, [secondsLeft, onElapsed]);
+  }, [clock, secondsLeft, onElapsed]);
 
   const drained = 1 - secondsLeft / WINDOW_SECONDS;
 

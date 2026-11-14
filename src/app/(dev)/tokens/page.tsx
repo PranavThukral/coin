@@ -159,7 +159,7 @@ function HeroStat({ label, value }: { label: string; value: number }) {
   return (
     <div>
       <p className="text-xs font-bold text-on-ink-muted">{label}</p>
-      <p className="money mt-1 text-lg font-extrabold">{value < 0 ? `−${money(-value)}` : money(value)}</p>
+      <p className="money mt-1 text-lg font-extrabold">{value < 0 ? `\u2212${money(-value)}` : money(value)}</p>
     </div>
   );
 }
@@ -172,7 +172,7 @@ function AccountRow({ name, kind, amount }: { name: string; kind: string; amount
         <p className="text-sm font-semibold text-subtle">{kind}</p>
       </div>
       <p className={`money text-lg font-extrabold ${amount < 0 ? "text-loss" : ""}`}>
-        {amount < 0 ? `−${money(-amount)}` : money(amount)}
+        {amount < 0 ? `\u2212${money(-amount)}` : money(amount)}
       </p>
     </div>
   );

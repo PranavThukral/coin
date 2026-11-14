@@ -1,4 +1,4 @@
-import "dotenv/config";
+import { loadScriptEnv } from "./env";
 import postgres from "postgres";
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -23,6 +23,7 @@ export async function migrate(url: string): Promise<void> {
   } finally { await sql.end(); }
 }
 if (process.argv[1] && resolve(process.argv[1]) === resolve("scripts/migrate.ts")) {
+  loadScriptEnv();
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
   migrate(process.env.DATABASE_URL).catch(error => { console.error(error); process.exitCode = 1; });
 }

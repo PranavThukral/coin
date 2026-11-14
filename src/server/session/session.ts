@@ -30,10 +30,14 @@ type FoundSession = SessionRow & { id: string };
 
 const IDLE_MS = SESSION.idle_minutes * 60 * 1000;
 
-/** Each new session clones ~2,300 rows, so creation is capped. */
+/**
+ * Each new session clones ~2,300 rows (roughly 0.7 MB with indexes), so
+ * creation is capped. 500 live sessions stay inside a free-tier Postgres
+ * (0.5 GB); idle ones are swept as new visitors arrive.
+ */
 export const SESSION_LIMITS = {
   newPerIpPerHour: 20,
-  maxActive: 2_000,
+  maxActive: 500,
   sweepBatch: 25,
 } as const;
 

@@ -1,7 +1,8 @@
 import { addDays, dollarsToCents, ToolInputs, UNTRUSTED_NOTE, type ToolName } from "../../contracts";
 import type { Tx } from "../db/types";
+import { AppError } from "../errors";
 import * as q from "../db/queries";
-import { cashflow, holdingViews, portfolioSeries, spending } from "./data";
+import { cashflow, clampToHistory, holdingViews, portfolioSeries, spending } from "./data";
 import { checkAffordability } from "./affordability";
 import { recurringChanges } from "./recurring";
 
@@ -70,12 +71,14 @@ export async function runReadTool(db: Tx, sid: string, name: ReadName, input: un
     }
     case "get_holdings": {
       const p = ToolInputs.get_holdings.parse(input);
-      return (await holdingViews(db, sid)).filter(h => !p.account_id || h.account_id === p.account_id);
+      const all = await holdingViews(db, sid);
+      // Each row already carries ticker_weight_of_portfolio (combined across accounts).
+      return all.filter(h => !p.account_id || h.account_id === p.account_id);
     }
     case "get_portfolio_performance": {
       const p = ToolInputs.get_portfolio_performance.parse(input);
-      const from = p.from ?? addDays(today, -365);
-      const to = p.to ?? today;
+      const from = clampToHistory(p.from ?? addDays(today, -365), today);
+      const to = clampToHistory(p.to ?? today, today);
       const [holdingsSeries, transactions, accounts] = await Promise.all([
         portfolioSeries(db, sid, from, to, p.account_id, p.interval),
         q.transactions(db, sid), q.accounts(db, sid),
@@ -103,9 +106,9 @@ export async function runReadTool(db: Tx, sid: string, name: ReadName, input: un
     }
     case "get_price_history": {
       const p = ToolInputs.get_price_history.parse(input);
-      return (await q.prices(db, sid)).filter(x =>
-        x.ticker === p.ticker && x.date >= (p.from ?? addDays(today, -365)) && x.date <= (p.to ?? today),
-      );
+      const from = clampToHistory(p.from ?? addDays(today, -365), today);
+      const to = clampToHistory(p.to ?? today, today);
+      return (await q.prices(db, sid)).filter(x => x.ticker === p.ticker && x.date >= from && x.date <= to);
     }
     case "get_upcoming": {
       const p = ToolInputs.get_upcoming.parse(input);
@@ -129,7 +132,7 @@ export async function runReadTool(db: Tx, sid: string, name: ReadName, input: un
     case "check_affordability": {
       const p = ToolInputs.check_affordability.parse(input);
       const cents = dollarsToCents(p.amount_cad);
-      if (cents === null) throw new Error("Invalid amount");
+      if (cents === null) throw new AppError("invalid", "amount_cad can have at most 2 decimals.");
       return wrap(await checkAffordability(
         db, sid, cents, p.on_date ?? today, p.from_account_id ?? "acc_chequing",
       ));

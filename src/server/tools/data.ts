@@ -6,6 +6,21 @@ import { holdingsTimeline, priceIndex } from "./history";
 import * as q from "../db/queries";
 import type { Tx } from "../db/types";
 
+/** The ledger and price history cover the two years before the session's today. */
+const HISTORY_DAYS = 730;
+
+/**
+ * Keeps a requested date inside the history that exists. The model picks
+ * chart and report ranges; a range starting in 1990 would otherwise produce
+ * hundreds of empty points.
+ */
+export function clampToHistory(date: string, today: string): string {
+  const earliest = addDays(today, -HISTORY_DAYS);
+  if (date < earliest) return earliest;
+  if (date > today) return today;
+  return date;
+}
+
 export async function holdingViews(db: Tx, sid: string): Promise<HoldingView[]> {
   const [hs, ps, session] = await Promise.all([
     q.holdings(db, sid), q.prices(db, sid), q.sessionInfo(db, sid),
@@ -13,12 +28,22 @@ export async function holdingViews(db: Tx, sid: string): Promise<HoldingView[]> 
   const latest = new Map<string, number>();
   for (const p of ps) if (p.date <= session.today_date) latest.set(p.ticker, p.close_cents);
   const total = hs.reduce((sum, h) => sum + h.quantity * (latest.get(h.ticker) ?? 0), 0);
+  // A ticker held in two accounts is one concentration: its combined value.
+  const byTicker = new Map<string, number>();
+  for (const h of hs) {
+    byTicker.set(h.ticker, (byTicker.get(h.ticker) ?? 0) + h.quantity * (latest.get(h.ticker) ?? 0));
+  }
   return hs.map(h => {
     const price = latest.get(h.ticker) ?? 0;
     const value = h.quantity * price;
-    return { ...h, last_price_cents: price, market_value_cents: value,
+    return {
+      ...h,
+      last_price_cents: price,
+      market_value_cents: value,
       unrealized_gain_cents: value - h.quantity * h.avg_cost_cents,
-      weight_of_portfolio: total ? value / total : 0 };
+      weight_of_portfolio: total ? value / total : 0,
+      ticker_weight_of_portfolio: total ? (byTicker.get(h.ticker) ?? 0) / total : 0,
+    };
   });
 }
 
