@@ -3,7 +3,9 @@ import type { Tx } from "../db/types";
 import * as q from "../db/queries";
 import { cashflow } from "./data";
 
-export async function checkAffordability(db: Tx, sid: string, amount: number, onDate: string, fromAccount = "acc_chequing"): Promise<AffordabilityResult> {
+export async function checkAffordability(
+  db: Tx, sid: string, amount: number, onDate: string, fromAccount = "acc_chequing",
+): Promise<AffordabilityResult> {
   const [accounts, session] = await Promise.all([q.accounts(db, sid), q.sessionInfo(db, sid)]);
   const source = accounts.find(a => a.id === fromAccount);
   if (!source) throw new Error("Account not found");
@@ -20,9 +22,21 @@ export async function checkAffordability(db: Tx, sid: string, amount: number, on
   let lowestDate = onDate;
   for (const event of events) {
     balance += event.amount_cents;
-    if (balance < lowest) { lowest = balance; lowestDate = event.date; }
+    if (balance < lowest) {
+      lowest = balance;
+      lowestDate = event.date;
+    }
   }
-  const available = fromAccount === "acc_chequing" ? lowest + amount - RULE_LIMITS.min_buffer_cents : source.balance_cents;
-  const verdict = lowest < 0 || (fromAccount !== "acc_chequing" && source.balance_cents < amount) ? "not_now" : lowest < RULE_LIMITS.min_buffer_cents ? "tight" : "comfortable";
-  return { verdict, lowest_balance_cents: lowest, lowest_balance_date: lowestDate, max_comfortable_cents: Math.max(0, available), upcoming_considered: events };
+  const available = fromAccount === "acc_chequing"
+    ? lowest + amount - RULE_LIMITS.min_buffer_cents : source.balance_cents;
+  let verdict: AffordabilityResult["verdict"] = "comfortable";
+  if (lowest < 0 || (fromAccount !== "acc_chequing" && source.balance_cents < amount)) {
+    verdict = "not_now";
+  } else if (lowest < RULE_LIMITS.min_buffer_cents) {
+    verdict = "tight";
+  }
+  return {
+    verdict, lowest_balance_cents: lowest, lowest_balance_date: lowestDate,
+    max_comfortable_cents: Math.max(0, available), upcoming_considered: events,
+  };
 }
