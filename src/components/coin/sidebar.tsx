@@ -25,11 +25,24 @@ function moodOf(chat: ChatState): MascotMood {
   return "idle";
 }
 
+/** Coin may bold key figures with **double asterisks**; nothing else is formatted. */
+function withBold(paragraph: string): React.ReactNode[] {
+  return paragraph.split(/(\*\*[^*]+\*\*)/g).map((piece, i) =>
+    piece.startsWith("**") && piece.endsWith("**") && piece.length > 4 ? (
+      <strong key={i} className="font-extrabold">
+        {piece.slice(2, -2)}
+      </strong>
+    ) : (
+      piece
+    ),
+  );
+}
+
 function CoinText({ text }: { text: string }) {
   return (
     <div className="space-y-2 text-sm font-medium leading-6">
       {text.split(/\n{2,}/).map((paragraph, i) => (
-        <p key={i}>{paragraph}</p>
+        <p key={i}>{withBold(paragraph)}</p>
       ))}
     </div>
   );
