@@ -3,10 +3,24 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import { generateSeed, requiredTopUp } from "./generate";
 import { insertSeed, type Database } from "../seed";
-import { addDays, daysBetween, HISTORY_START, PERSONA, PLANTED_SUBSCRIPTION, PLANTED_TRANSACTIONS, SEED_ACCOUNTS, SEED_ANCHOR_DATE, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM, SEED_SECURITIES, TEMPLATE_SESSION_ID } from "../../src/contracts";
+import { addDays, daysBetween, HISTORY_START, PERSONA, PLANTED_SUBSCRIPTION, PLANTED_TRANSACTIONS, SEED_ACCOUNTS, SEED_ANCHOR_DATE, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM, SEED_SECURITIES, SPENDING_KINDS, TEMPLATE_SESSION_ID } from "../../src/contracts";
 
 const seed = generateSeed();
 describe("deterministic seed", () => {
+  it("keeps typical spending and annual spending below income", () => {
+    const months = ["2025-11", "2025-12", ...Array.from({ length: 10 }, (_, i) =>
+      `2026-${String(i + 1).padStart(2, "0")}`)];
+    const spending = months.map(month => -seed.transactions
+      .filter(t => t.posted_on.startsWith(month) && SPENDING_KINDS.includes(t.kind))
+      .reduce((sum, t) => sum + t.amount_cents, 0));
+    const sorted = [...spending].sort((a, b) => a - b);
+    const median = (sorted[5] + sorted[6]) / 2;
+    const income = seed.transactions.filter(t => t.posted_on >= "2025-11-01" &&
+      t.posted_on < "2026-11-01" && t.kind === "income").reduce((sum, t) => sum + t.amount_cents, 0);
+    expect(median).toBeGreaterThanOrEqual(480000);
+    expect(median).toBeLessThanOrEqual(560000);
+    expect(spending.reduce((sum, amount) => sum + amount, 0)).toBeLessThan(income * 0.8);
+  });
   it("keeps recent purchases plausible and has only the planted November sofa", () => {
     const recent = seed.transactions.filter(t => t.kind === "purchase" &&
       t.posted_on >= addDays(SEED_ANCHOR_DATE, -10) && !t.id.startsWith("txn_planted"));

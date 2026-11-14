@@ -37,10 +37,10 @@ const merchants: Merchant[] = [
   { name: "Brightvale Dental", category: "health_fitness", cents: 18500, interval: 182, offset: 18 },
   { name: "Riverbend Gifts", category: "gifts_social", cents: 4500, interval: 75, offset: 9 },
   { name: "Northcrest Service", category: "fees", cents: 450, interval: 60, offset: 11 },
-  { name: "Harvest Lane Market", category: "groceries", cents: 17500, interval: 7, offset: 1 },
-  { name: "Meadow Kitchen", category: "dining", cents: 14500, interval: 7, offset: 3 },
-  { name: "Stonebridge Outfitters", category: "shopping", cents: 16000, interval: 7, offset: 4 },
-  { name: "Evergreen Supplies", category: "shopping", cents: 15000, interval: 7, offset: 6 },
+  { name: "Harvest Lane Market", category: "groceries", cents: 5500, interval: 7, offset: 1 },
+  { name: "Meadow Kitchen", category: "dining", cents: 5000, interval: 7, offset: 3 },
+  { name: "Stonebridge Outfitters", category: "shopping", cents: 5000, interval: 7, offset: 4 },
+  { name: "Evergreen Supplies", category: "shopping", cents: 4000, interval: 7, offset: 6 },
 ];
 const subscriptions = [
   ["Moonbeam Audio", 1299, 8], ["Pagehaven", 999, 11],
@@ -141,11 +141,14 @@ function generateEvents(ledger: Ledger, date: string) {
 function generateInvesting(ledger: Ledger, date: string) {
   const day = Number(date.slice(8));
   if (day === 12) ledger.pair(date, "acc_chequing", "acc_hisa", 30000);
-  if (day === 14) ledger.pair(date, "acc_chequing", "acc_tfsa", 180000);
-  if (day === 16) ledger.pair(date, "acc_chequing", "acc_rrsp", date.slice(5, 7) === "02" ? 180000 : 110000);
-  if ((day === 18 && date !== "2026-10-18") || date === "2026-11-14") {
-    const monthIndex = date === "2026-11-14" ? 23 :
-      (Number(date.slice(0, 4)) - 2024) * 12 + Number(date.slice(5, 7)) - 11;
+  // The anchor month's contribution and buys have not happened yet: the last
+  // buys are on 2026-10-18, four weeks before the anchor date.
+  const anchorMonth = date >= "2026-11-01";
+  if (day === 14 && !anchorMonth) ledger.pair(date, "acc_chequing", "acc_tfsa", 180000);
+  if (day === 16) ledger.pair(date, "acc_chequing", "acc_rrsp", 10000);
+  if (day === 18) {
+    // Month 0 is November 2024; month 23 is October 2026.
+    const monthIndex = (Number(date.slice(0, 4)) - 2024) * 12 + Number(date.slice(5, 7)) - 11;
     for (const holding of SEED_HOLDINGS) {
       const quantity = Math.floor(holding.quantity / 24) + (monthIndex < holding.quantity % 24 ? 1 : 0);
       if (quantity > 0 && monthIndex >= 0 && monthIndex < 24) {
@@ -193,7 +196,7 @@ function balanceCardCycle(ledger: Ledger) {
     !item.id.startsWith("txn_planted") && item.category !== "subscriptions");
   for (const [index, purchase] of purchases.entries()) {
     const adjustment = Math.trunc(remainder / (purchases.length - index));
-    if (Math.abs(adjustment) > 4000 || purchase.amount_cents - adjustment >= 0) {
+    if (Math.abs(adjustment) > 10000 || purchase.amount_cents - adjustment >= 0) {
       throw new Error("Card cycle cannot be balanced within purchase limits");
     }
     purchase.amount_cents -= adjustment;
@@ -219,7 +222,10 @@ function savingsTopUps(ledger: Ledger) {
   const net = daily.flat().reduce((sum, item) => sum + item.amount_cents, 0);
   const target = SEED_ACCOUNTS.find(account => account.id === "acc_chequing")!.balance_cents;
   const baseline = target - net;
-  for (let opening = baseline; opening >= 0; opening -= 50000) {
+
+  // Walk chequing forward from an opening balance, topping up from savings
+  // the day before any outflow would take it under $300.
+  const simulate = (opening: number) => {
     let balance = opening;
     const topUps: { date: string; amount: number }[] = [];
     for (let index = 0; index < daily.length; index += 1) {
@@ -231,12 +237,25 @@ function savingsTopUps(ledger: Ledger) {
         topUps.push({ date: addDays(HISTORY_START, index), amount });
       }
     }
-    if (balance === target) {
+    return topUps;
+  };
+
+  // The opening balance must leave room for the top-ups: opening + net +
+  // top-ups = target. Iterate to the fixed point (top-ups only grow as the
+  // opening shrinks, so this converges quickly).
+  let opening = baseline;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const topUps = simulate(opening);
+    const total = topUps.reduce((sum, item) => sum + item.amount, 0);
+    const next = baseline - total;
+    if (next === opening) {
       for (const topUp of topUps) {
         ledger.pair(topUp.date, "acc_hisa", "acc_chequing", topUp.amount);
       }
       return;
     }
+    if (next < 0) break;
+    opening = next;
   }
   throw new Error("Cannot reconcile need-based savings top-ups");
 }
