@@ -23,7 +23,7 @@
  */
 import { z } from "zod";
 
-export const CONTRACTS_VERSION = "1.2.0"; // 1.1: live dates, card = bill payment, daily outflow. 1.2: confirmed email in RuleContext, message variants
+export const CONTRACTS_VERSION = "1.3.0"; // 1.1: live dates, card = bill payment, daily outflow. 1.2: confirmed email, message variants. 1.3: bills may be $0
 
 /* ========================================================================== */
 /* 1. CONVENTIONS                                                             */
@@ -262,7 +262,7 @@ export type Price = z.infer<typeof Price>;
 export const Bill = z.object({
   id: z.string(), // "bill_rent"
   payee: z.string(), // UNTRUSTED text (injection surface)
-  amount_cents: PositiveCents,
+  amount_cents: z.int().min(0).max(100_000_000), // 0 = nothing due (e.g. card statement paid)
   due_date: IsoDate,
   recurrence: z.enum(["monthly", "quarterly", "annual", "once"]),
   category: Category,
