@@ -255,3 +255,17 @@ export async function settleDueActions(db: Db, sessionId: string, now: Date): Pr
   for (const row of rows) cards.push(await settleOne(db, sessionId, row.id, now));
   return cards;
 }
+
+/** This session's action cards, newest first, optionally filtered by status. */
+export async function listActions(
+  db: Db, sessionId: string, status: ActionStatus | null,
+): Promise<ActionCard[]> {
+  const rows = await db.query<ActionRow>(
+    `select * from actions where session_id = $1 and ($2::text is null or status = $2)
+     order by created_at desc, id desc limit 50`,
+    [sessionId, status],
+  );
+  const cards: ActionCard[] = [];
+  for (const row of rows) cards.push(await toActionCard(db, sessionId, row));
+  return cards;
+}

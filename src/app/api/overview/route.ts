@@ -1,9 +1,11 @@
 import { AccountId } from "../../../contracts";
-import { db } from "../../../server/db/client";
 import { getOverview } from "../../../server/overview";
-import { requireSessionId } from "../../../server/session/stub";
+import { withSession } from "../../../server/session/http";
 
-export async function GET(request: Request) {
-  const account = new URL(request.url).searchParams.get("account_id");
-  return Response.json(await getOverview(db(), requireSessionId(request), account ? AccountId.parse(account) : null));
+export function GET(request: Request) {
+  return withSession(request, async ({ db, sessionId }) => {
+    const raw = new URL(request.url).searchParams.get("account_id");
+    const accountId = raw ? AccountId.parse(raw) : null;
+    return Response.json(await getOverview(db, sessionId, accountId));
+  });
 }

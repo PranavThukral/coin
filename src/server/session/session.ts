@@ -8,7 +8,14 @@
  * approved action whose undo window has ended (there is no background timer).
  */
 import { createHash, randomUUID } from "node:crypto";
-import { SEED_ANCHOR_DATE, SESSION, TEMPLATE_SESSION_ID, Uuid, daysBetween, torontoToday } from "../../contracts";
+import {
+  SEED_ANCHOR_DATE,
+  SESSION,
+  TEMPLATE_SESSION_ID,
+  Uuid,
+  daysBetween,
+  torontoToday,
+} from "../../contracts";
 import { settleDueActions } from "../actions/service";
 import type { Db } from "../db/types";
 
@@ -18,6 +25,7 @@ export interface ResolvedSession {
 }
 
 type SessionRow = { today_date: string; last_seen_at: string };
+type FoundSession = SessionRow & { id: string };
 
 const IDLE_MS = SESSION.idle_minutes * 60 * 1000;
 
@@ -46,7 +54,7 @@ export async function createSession(db: Db, now: Date, ipHash: string | null): P
   return id;
 }
 
-async function findSession(db: Db, cookieValue: string | null): Promise<(SessionRow & { id: string }) | null> {
+async function findSession(db: Db, cookieValue: string | null): Promise<FoundSession | null> {
   const parsed = Uuid.safeParse(cookieValue);
   if (!parsed.success || parsed.data === TEMPLATE_SESSION_ID) return null;
 
