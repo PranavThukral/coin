@@ -52,6 +52,15 @@ export function AlertIcon(props: IconProps) {
   );
 }
 
+export function UndoIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5.5 4.5L2.5 7.5l3 3" />
+      <path d="M2.5 7.5h7a4 4 0 010 8h-2" />
+    </Svg>
+  );
+}
+
 export function ArrowIcon(props: IconProps) {
   return (
     <Svg {...props}>

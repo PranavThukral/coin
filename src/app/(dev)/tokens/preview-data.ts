@@ -63,7 +63,7 @@ const base: ActionCard = {
 
 export const exampleCards: { label: string; card: ActionCard }[] = [
   {
-    label: "01 / Proposed",
+    label: "Proposed",
     card: {
       ...base,
       type: "transfer",
@@ -82,7 +82,7 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
     },
   },
   {
-    label: "02 / Second confirmation",
+    label: "Second confirmation",
     card: {
       ...base,
       type: "etransfer",
@@ -100,7 +100,7 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
     },
   },
   {
-    label: "03 / Blocked",
+    label: "Blocked",
     card: {
       ...base,
       status: "blocked",
@@ -117,9 +117,15 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
       }),
     },
   },
-  { label: "04 / Pending undo", card: { ...base, status: "pending_undo", execute_at: "2026-11-15T12:01:00Z" } },
-  { label: "05 / Executed", card: { ...base, status: "executed", executed_at: "2026-11-15T12:01:00Z" } },
-  { label: "06 / Cancelled", card: { ...base, status: "cancelled" } },
+  {
+    label: "Pending undo",
+    card: { ...base, status: "pending_undo", title: "Pay $1,250.00 to your card", execute_at: "2026-11-15T12:01:00Z" },
+  },
+  {
+    label: "Executed",
+    card: { ...base, status: "executed", title: "Paid $1,250.00 to your card", executed_at: "2026-11-15T12:01:00Z" },
+  },
+  { label: "Cancelled", card: { ...base, status: "cancelled", title: "Pay $1,250.00 to your card" } },
 ];
 
 export const colourRoles = [
