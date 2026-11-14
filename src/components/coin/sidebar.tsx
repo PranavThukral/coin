@@ -67,7 +67,7 @@ function Message({ message, controls }: { message: ChatMessage; controls: CardCo
               onUndo={() => controls.undo(part.card)}
               onExecuteNow={() => controls.executeNow(part.card)}
               onConfirmRecipient={(email) => controls.confirmRecipient(part.card, email)}
-              onUseInstead={(amount) => controls.useInstead(part.card, amount)}
+              onUseInstead={() => controls.useInstead(part.card)}
               onWindowElapsed={() => controls.settle(part.card)}
             />
           ),

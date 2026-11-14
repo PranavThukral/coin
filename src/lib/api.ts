@@ -62,6 +62,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  /** Establishes the session cookie; call once before parallel requests. */
+  session: () => request<{ today: string; expires_at: string }>("/api/session"),
   dashboard: () => request<DashboardPayload>("/api/dashboard"),
   account: (id: string) => request<AccountDetailPayload>(`/api/accounts/${id}`),
   overview: (accountId: string | null) =>
@@ -70,6 +72,8 @@ export const api = {
   approve: (id: string) => request<ActionCard>(`/api/actions/${id}/approve`, { method: "POST" }),
   dismiss: (id: string) => request<ActionCard>(`/api/actions/${id}/dismiss`, { method: "POST" }),
   undo: (id: string) => request<ActionCard>(`/api/actions/${id}/undo`, { method: "POST" }),
+  retry: (id: string) =>
+    request<{ message: string; card: ActionCard }>(`/api/actions/${id}/retry`, { method: "POST" }),
   executeNow: (id: string) => request<ActionCard>(`/api/actions/${id}/execute-now`, { method: "POST" }),
   confirmRecipient: (id: string, email: string) =>
     request<ActionCard>(`/api/actions/${id}/confirm-recipient`, {

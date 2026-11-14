@@ -52,7 +52,7 @@ export function holdingsTimeline(current: Holding[], transactions: Transaction[]
   const trades: Trade[] = [];
   for (const t of transactions) {
     if (t.kind !== "trade_buy" && t.kind !== "trade_sell") continue;
-    const delta = tradeQuantity(t.description);
+    const delta = tradeQuantity(t);
     if (delta === null) continue;
     trades.push({ key: keyOf(t.account_id, t.merchant), date: t.posted_on, delta });
   }

@@ -3,8 +3,15 @@
 import { useCallback, useRef, useState } from "react";
 import type { AccountId, ActionCard } from "../../contracts";
 import { api, ApiError } from "../../lib/api";
-import { addUserMessage, applyEvent, initialChat, replaceCard, type ChatState, type ChatTransport } from "../../lib/chat";
-import { insteadMessage } from "../../lib/instead";
+import {
+  addRetry,
+  addUserMessage,
+  applyEvent,
+  initialChat,
+  replaceCard,
+  type ChatState,
+  type ChatTransport,
+} from "../../lib/chat";
 
 export interface CardControls {
   busyId: string | null;
@@ -14,7 +21,7 @@ export interface CardControls {
   undo(card: ActionCard): void;
   executeNow(card: ActionCard): void;
   confirmRecipient(card: ActionCard, email: string): void;
-  useInstead(card: ActionCard, amountCents: number): void;
+  useInstead(card: ActionCard): void;
   settle(card: ActionCard): void;
 }
 
@@ -82,7 +89,18 @@ export function useCoinChat(transport: ChatTransport, onActionSettled: () => voi
     undo: (card) => runAction(card, () => api.undo(card.action_id)),
     executeNow: (card) => runAction(card, () => api.executeNow(card.action_id)),
     confirmRecipient: (card, email) => runAction(card, () => api.confirmRecipient(card.action_id, email)),
-    useInstead: (card, amountCents) => send(insteadMessage(card, amountCents), null),
+    useInstead: async (card) => {
+      setBusyId(card.action_id);
+      try {
+        const { message, card: next } = await api.retry(card.action_id);
+        setChat((state) => addRetry(state, message, next));
+      } catch (error) {
+        const text = error instanceof ApiError ? error.message : "That didn't go through. Try again.";
+        setErrors((current) => ({ ...current, [card.action_id]: text }));
+      } finally {
+        setBusyId(null);
+      }
+    },
     settle,
   };
 

@@ -44,7 +44,13 @@ function clientIp(request: Request): string {
   return request.headers.get("x-real-ip") ?? "unknown";
 }
 
-function sessionCookie(sessionId: string): string {
+/** HTTPS directly, or behind a proxy that says so (Vercel sets x-forwarded-proto). */
+function isHttps(request: Request): boolean {
+  if (request.headers.get("x-forwarded-proto") === "https") return true;
+  return new URL(request.url).protocol === "https:";
+}
+
+function sessionCookie(sessionId: string, secure: boolean): string {
   const parts = [
     `${SESSION.cookie_name}=${sessionId}`,
     "Path=/",
@@ -52,7 +58,7 @@ function sessionCookie(sessionId: string): string {
     "SameSite=Lax",
     `Max-Age=${SESSION.idle_minutes * 60}`,
   ];
-  if (process.env.NODE_ENV === "production") parts.push("Secure");
+  if (secure) parts.push("Secure");
   return parts.join("; ");
 }
 
@@ -72,21 +78,22 @@ export async function withSession(
   handler: (context: SessionContext) => Promise<Response>,
 ): Promise<Response> {
   const now = new Date();
-  const db = database();
-  let newCookie: string | null = null;
+  let cookie: string | null = null;
   let response: Response;
 
   try {
+    const db = database();
     const ipHash = hashIp(clientIp(request), process.env.IP_HASH_SALT ?? "");
-    const cookie = readCookie(request, SESSION.cookie_name);
-    const session = await resolveSession(db, cookie, now, ipHash);
-    if (session.isNew) newCookie = sessionCookie(session.sessionId);
+    const session = await resolveSession(db, readCookie(request, SESSION.cookie_name), now, ipHash);
+    // Refresh on every response: the browser's expiry slides with activity,
+    // matching the server's idle window.
+    cookie = sessionCookie(session.sessionId, isHttps(request));
     response = await handler({ db, sessionId: session.sessionId, now });
   } catch (error) {
     response = errorResponse(error);
   }
 
-  if (newCookie) response.headers.append("Set-Cookie", newCookie);
+  if (cookie) response.headers.append("Set-Cookie", cookie);
   return response;
 }
 

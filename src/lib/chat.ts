@@ -68,6 +68,20 @@ export function applyEvent(state: ChatState, event: ChatEvent): ChatState {
   }
 }
 
+/** "Use $X instead": the server's request text, then Coin's new card. */
+export function addRetry(state: ChatState, text: string, card: ActionCard): ChatState {
+  const user: ChatMessage = { id: nextId("u"), role: "user", text, parts: [], error: null, done: true };
+  const coin: ChatMessage = {
+    id: nextId("c"),
+    role: "coin",
+    text: "Here it is at the largest amount that passes the checks.",
+    parts: [{ kind: "card", card }],
+    error: null,
+    done: true,
+  };
+  return { ...state, messages: [...state.messages, user, coin] };
+}
+
 /** Replace an action card wherever it appears (after approve, undo, settle...). */
 export function replaceCard(state: ChatState, card: ActionCard): ChatState {
   const messages = state.messages.map((message) => ({
