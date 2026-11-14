@@ -267,13 +267,8 @@
   0%, 100% { transform: scaleX(1); }
   50% { transform: scaleX(0.12); }
 }
-@keyframes coin-blink {
-  0%, 92%, 100% { transform: scaleY(1); }
-  95% { transform: scaleY(0.1); }
-}
 .coin-edge-turning { transform-origin: 32px 32px; animation: coin-edge-turn 2.4s linear infinite; }
 .coin-flipping { transform-origin: 32px 32px; animation: coin-flip 1.1s var(--ease-coin) infinite; }
-.coin-blinking { transform-box: fill-box; transform-origin: center; animation: coin-blink 4s infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *,

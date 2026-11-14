@@ -55,13 +55,22 @@ Radius 10 / 18 / 28. One card shadow. Motion only answers an action:
   right, "Nothing moved. Your balances are unchanged."
 - Pending: violet ring drains over the real 60 seconds with a live counter.
 - Blocked: red edge bar on the left.
-- Mascot: blinks when idle; the rim turns while Coin is reading data.
+- Mark: the glint sweeps the rim while Coin is reading data.
 All motion stops under prefers-reduced-motion.
 
-## Mascot
+## Mascot (v3: geometric, no face)
 
-Four options on the preview page: Minted (coin face with a reeded rim),
-Stack (coin head on a stack), Flip (coin caught mid-flip), Sprout (coin with a
-sprout). Recommended: Minted. It reads at 16px, has clear moods (idle,
-thinking, happy, concerned), and its thinking state (the rim turning) is
-unmistakably a coin.
+v2's cartoon faces and tick-mark rims clashed with the system. v3 marks are
+flat shapes from the same tokens, with one crisp inner ring instead of ridges.
+Moods use motion and the card icon language: a glint sweeps the rim while
+thinking, a check when an action goes through, an alert when a check blocks it.
+
+Options: Ring (minted disc, inner ring, glint), Orbit (disc with an emerald
+companion that circles while working), Facet (disc cut on the diagonal, flips
+while thinking), Pair (gold over emerald). Recommended: Ring.
+
+## Cards: only what broke
+
+Approval cards list only failed or flagged checks. When nothing failed, one
+quiet "Checks passed" line remains, since that is the safety signal on a card
+the user is about to approve.

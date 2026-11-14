@@ -16,8 +16,8 @@ const ACCENTS = [
 ];
 
 const MOODS: { mood: MascotMood; when: string }[] = [
-  { mood: "idle", when: "Waiting (blinks)" },
-  { mood: "thinking", when: "Reading your data (rim turns)" },
+  { mood: "idle", when: "Waiting" },
+  { mood: "thinking", when: "Reading your data (glint sweeps)" },
   { mood: "happy", when: "Action went through" },
   { mood: "concerned", when: "A check blocked it" },
 ];
@@ -57,11 +57,11 @@ function MascotOptions() {
       </div>
 
       <div className="mt-6 rounded-coin border border-border bg-surface p-6 shadow-coin">
-        <p className="text-lg font-extrabold">Recommended: Minted, in every mood</p>
+        <p className="text-lg font-extrabold">Recommended: Ring, in every mood</p>
         <div className="mt-5 grid grid-cols-2 gap-6 md:grid-cols-4">
           {MOODS.map(({ mood, when }) => (
             <div key={mood} className="flex flex-col items-center text-center">
-              <Mascot variant="minted" mood={mood} size={72} />
+              <Mascot variant="ring" mood={mood} size={72} />
               <p className="mt-3 text-sm font-extrabold capitalize">{mood}</p>
               <p className="text-xs font-medium text-muted">{when}</p>
             </div>
@@ -324,7 +324,7 @@ function ThemeSheet({ theme }: { theme: "light" | "dark" }) {
       <div className="mx-auto max-w-7xl px-6 py-14 md:px-12 md:py-20">
         <header className="flex flex-wrap items-center justify-between gap-6">
           <div className="flex items-center gap-5">
-            <Mascot size={72} mood="happy" />
+            <Mascot size={72} />
             <div>
               <h2 className="text-5xl font-extrabold tracking-tight">Coin</h2>
               <p className="mt-1 text-lg font-semibold text-muted">Design system v2, {theme} theme</p>
@@ -333,7 +333,7 @@ function ThemeSheet({ theme }: { theme: "light" | "dark" }) {
         </header>
 
         <Section>
-          <Heading title="Meet Coin" body="Four mascot options. Each needs to work at 16px in a tab, 44px collapsed, and big on the welcome screen." />
+          <Heading title="Meet Coin" body="Four marks, no faces: flat shapes from the same tokens as everything else. Each works at 16px in a tab, 44px collapsed, and large on the welcome screen." />
           <MascotOptions />
         </Section>
         <Section>
@@ -352,7 +352,7 @@ function ThemeSheet({ theme }: { theme: "light" | "dark" }) {
         <Section>
           <Heading
             title="Approval cards"
-            body="Every state has its own frame. Done gets a green ring and a check that draws in; cancelled gets a red border and a struck-through amount."
+            body="Every state has its own frame. Cards list only the checks that broke."
           />
           <ActionCards />
         </Section>

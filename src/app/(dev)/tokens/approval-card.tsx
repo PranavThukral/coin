@@ -55,9 +55,18 @@ function ExecutedBadge() {
   );
 }
 
+/** Only what broke or needs attention. When nothing did, one quiet line. */
 function CheckList({ checks }: { checks: CheckResult[] }) {
   const problems = checks.filter((c) => c.outcome === "fail" || c.outcome === "flag");
-  const okCount = checks.length - problems.length;
+
+  if (problems.length === 0) {
+    return (
+      <p className="mt-4 flex items-center gap-2 border-t border-border pt-3 text-sm font-semibold text-subtle">
+        <CheckIcon className="h-3.5 w-3.5 text-gain" />
+        Checks passed
+      </p>
+    );
+  }
 
   return (
     <div className="mt-4 space-y-2 border-t border-border pt-3 text-sm">
@@ -70,10 +79,6 @@ function CheckList({ checks }: { checks: CheckResult[] }) {
           <span>{check.message}</span>
         </p>
       ))}
-      <p className="flex items-center gap-2 font-semibold text-subtle">
-        <CheckIcon className="h-3.5 w-3.5 text-gain" />
-        {problems.length === 0 ? `All ${okCount} checks passed` : `${okCount} other checks passed`}
-      </p>
     </div>
   );
 }
