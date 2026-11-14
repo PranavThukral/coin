@@ -1,12 +1,36 @@
 import { describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
-import { generateSeed, requiredTopUp } from "./generate";
+import { generateSeed, holdingsAt, requiredTopUp } from "./generate";
 import { insertSeed, type Database } from "../seed";
 import { addDays, daysBetween, HISTORY_START, PERSONA, PLANTED_SUBSCRIPTION, PLANTED_TRANSACTIONS, SEED_ACCOUNTS, SEED_ANCHOR_DATE, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM, SEED_SECURITIES, SPENDING_KINDS, TEMPLATE_SESSION_ID } from "../../src/contracts";
 
 const seed = generateSeed();
 describe("deterministic seed", () => {
+  it("reconstructs nonnegative positions through the anchor", () => {
+    expect(holdingsAt(SEED_ANCHOR_DATE)).toEqual(SEED_HOLDINGS);
+    const dates = [HISTORY_START, ...new Set(seed.transactions.filter(t => t.kind === "trade_buy").map(t => t.posted_on))];
+    for (const date of dates) expect(holdingsAt(date).every(item => item.quantity >= 0), date).toBe(true);
+  });
+  it("keeps savings and investment opening cash plausible", () => {
+    const hisa = seed.accounts.find(a => a.id === "acc_hisa")!;
+    expect(hisa.opening_balance_cents).toBeGreaterThanOrEqual(500000);
+    expect(hisa.opening_balance_cents).toBeLessThanOrEqual(1200000);
+    for (const account of seed.accounts.filter(a => ["tfsa", "rrsp", "non_registered"].includes(a.type))) {
+      expect(Math.abs(account.opening_balance_cents - account.balance_cents), account.id).toBeLessThanOrEqual(500000);
+    }
+  });
+  it("buys shares near each monthly contribution at the recorded close", () => {
+    for (const row of seed.transactions.filter(t => t.kind === "trade_buy")) {
+      const month = row.posted_on.slice(0, 7);
+      const contribution = seed.transactions.find(t => t.account_id === row.account_id &&
+        t.kind === "transfer_in" && t.posted_on.startsWith(month))!;
+      expect(-row.amount_cents).toBeGreaterThanOrEqual(contribution.amount_cents * 0.75);
+      expect(-row.amount_cents).toBeLessThanOrEqual(contribution.amount_cents * 1.25);
+      const close = seed.prices.find(p => p.ticker === row.merchant && p.date === row.posted_on)!;
+      expect(-row.amount_cents).toBe(Number(row.description.split(" ")[1]) * close.close_cents);
+    }
+  });
   it("keeps typical spending and annual spending below income", () => {
     const months = ["2025-11", "2025-12", ...Array.from({ length: 10 }, (_, i) =>
       `2026-${String(i + 1).padStart(2, "0")}`)];
@@ -54,9 +78,9 @@ describe("deterministic seed", () => {
       expect(row.amount_cents).toBe(Math.ceil((30000 - minimum) / 50000) * 50000);
     }
   });
-  it("includes the anchor month's regular TFSA contribution", () => {
+  it("leaves the anchor month's TFSA contribution unmade", () => {
     const contributions = seed.transactions.filter(t => t.account_id === "acc_tfsa" && t.kind === "transfer_in");
-    expect(contributions.find(t => t.posted_on === "2026-11-14")?.amount_cents).toBe(180000);
+    expect(contributions.some(t => t.posted_on >= "2026-11-01")).toBe(false);
   });
   it("credits monthly savings interest on the balance before interest", () => {
     const account = seed.accounts.find(a => a.id === "acc_hisa")!;

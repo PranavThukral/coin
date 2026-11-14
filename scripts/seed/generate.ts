@@ -37,7 +37,7 @@ const merchants: Merchant[] = [
   { name: "Brightvale Dental", category: "health_fitness", cents: 18500, interval: 182, offset: 18 },
   { name: "Riverbend Gifts", category: "gifts_social", cents: 4500, interval: 75, offset: 9 },
   { name: "Northcrest Service", category: "fees", cents: 450, interval: 60, offset: 11 },
-  { name: "Harvest Lane Market", category: "groceries", cents: 5500, interval: 7, offset: 1 },
+  { name: "Harvest Lane Market", category: "groceries", cents: 7000, interval: 7, offset: 1 },
   { name: "Meadow Kitchen", category: "dining", cents: 5000, interval: 7, offset: 3 },
   { name: "Stonebridge Outfitters", category: "shopping", cents: 5000, interval: 7, offset: 4 },
   { name: "Evergreen Supplies", category: "shopping", cents: 4000, interval: 7, offset: 6 },
@@ -138,28 +138,46 @@ function generateEvents(ledger: Ledger, date: string) {
     "shopping", "refund", "REFUND CLOUDBERRY GOODS");
 }
 
-function generateInvesting(ledger: Ledger, date: string) {
+const investmentAccounts = ["acc_tfsa", "acc_rrsp", "acc_nonreg"] as const;
+
+function contribution(account: typeof investmentAccounts[number], date: string): number {
+  if (account === "acc_tfsa") return 60000;
+  if (account === "acc_nonreg") return 40000;
+  return date.startsWith("2026-02") ? 150000 : 50000;
+}
+
+function buyInvestments(ledger: Ledger, date: string, prices: Price[]) {
+  const monthIndex = (Number(date.slice(0, 4)) - 2024) * 12 + Number(date.slice(5, 7)) - 11;
+  for (const account of investmentAccounts) {
+    const holdings = SEED_HOLDINGS.filter(item => item.account_id === account);
+    const holding = holdings[monthIndex % holdings.length];
+    const close = prices.find(item => item.ticker === holding.ticker && item.date === date)!.close_cents;
+    const quantity = Math.round(contribution(account, date) / close);
+    ledger.add(account, date, -quantity * close, holding.ticker,
+      "investments", "trade_buy", `BUY ${quantity} ${holding.ticker}`);
+  }
+}
+
+function generateInvesting(ledger: Ledger, date: string, prices: Price[]) {
   const day = Number(date.slice(8));
-  if (day === 12) ledger.pair(date, "acc_chequing", "acc_hisa", 30000);
-  // The anchor month's contribution and buys have not happened yet: the last
-  // buys are on 2026-10-18, four weeks before the anchor date.
-  const anchorMonth = date >= "2026-11-01";
-  if (day === 14 && !anchorMonth) ledger.pair(date, "acc_chequing", "acc_tfsa", 180000);
-  if (day === 16) ledger.pair(date, "acc_chequing", "acc_rrsp", 10000);
-  if (day === 18) {
-    // Month 0 is November 2024; month 23 is October 2026.
-    const monthIndex = (Number(date.slice(0, 4)) - 2024) * 12 + Number(date.slice(5, 7)) - 11;
-    for (const holding of SEED_HOLDINGS) {
-      const quantity = Math.floor(holding.quantity / 24) + (monthIndex < holding.quantity % 24 ? 1 : 0);
-      if (quantity > 0 && monthIndex >= 0 && monthIndex < 24) {
-        ledger.add(holding.account_id, date, -quantity * holding.avg_cost_cents, holding.ticker,
-          "investments", "trade_buy", `BUY ${quantity} ${holding.ticker}`);
-      }
+  if (day === 12) {
+    const sweep = date === "2026-07-12" || date === "2026-11-12" ? 260000 :
+      date >= "2026-08-01" && date < "2026-11-01" ? 10000 : 60000;
+    if (sweep > 0) ledger.pair(date, "acc_chequing", "acc_hisa", sweep);
+  }
+  if ((day === 16 && date !== "2024-11-16" || date === "2024-11-22") && date < "2026-11-01") {
+    for (const account of investmentAccounts) {
+      ledger.pair(date, "acc_chequing", account, contribution(account, date));
     }
+  }
+  const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+  if (date === "2024-11-25" || (date >= "2024-12-01" && date < "2026-11-01" && day >= 18 && day <= 20 && weekday >= 1 && weekday <= 5 &&
+    (day === 18 || (day === 19 && weekday === 1) || (day === 20 && weekday === 1)))) {
+    buyInvestments(ledger, date, prices);
   }
   if (day === 20 && Number(date.slice(5, 7)) % 3 === 0) {
     for (const account of ["acc_tfsa", "acc_rrsp", "acc_nonreg"] as const) {
-      ledger.add(account, date, 7500, "CAEQ.CX", "investments", "dividend", "QUARTERLY DISTRIBUTION");
+      ledger.add(account, date, 3000, "CAEQ.CX", "investments", "dividend", "QUARTERLY DISTRIBUTION");
     }
   }
 }
@@ -196,8 +214,8 @@ function balanceCardCycle(ledger: Ledger) {
     !item.id.startsWith("txn_planted") && item.category !== "subscriptions");
   for (const [index, purchase] of purchases.entries()) {
     const adjustment = Math.trunc(remainder / (purchases.length - index));
-    if (Math.abs(adjustment) > 10000 || purchase.amount_cents - adjustment >= 0) {
-      throw new Error("Card cycle cannot be balanced within purchase limits");
+    if (Math.abs(adjustment) > 4000 || purchase.amount_cents - adjustment >= 0) {
+      throw new Error(`Card cycle cannot be balanced within purchase limits: ${remainder}, ${purchases.length}`);
     }
     purchase.amount_cents -= adjustment;
     remainder -= adjustment;
@@ -279,11 +297,12 @@ function balanceLedger(ledger: Ledger) {
 
 export function generateSeed(): SeedData {
   const ledger = createLedger();
+  const prices = generatePrices();
   dates().forEach((date, index) => {
     generatePayAndBills(ledger, date);
     generateSpending(ledger, date, index);
     generateEvents(ledger, date);
-    generateInvesting(ledger, date);
+    generateInvesting(ledger, date, prices);
     generateCardCycle(ledger, date);
   });
   ledger.transactions.push(...PLANTED_TRANSACTIONS.map(item => ({ ...item, transfer_group_id: null, action_id: null })));
@@ -293,5 +312,15 @@ export function generateSeed(): SeedData {
   return { accounts, transactions: ledger.transactions, holdings: SEED_HOLDINGS.map(item => ({ ...item })),
     bills: SEED_BILLS.map(item => ({ ...item })), contacts: SEED_CONTACTS.map(item => ({ ...item })),
     room: SEED_ROOM.map(item => ({ ...item })), securities: SEED_SECURITIES.map(({ ticker, name, kind, sector, dividend_yield_bps }) =>
-      ({ ticker, name, kind, sector, dividend_yield_bps })), prices: generatePrices() };
+      ({ ticker, name, kind, sector, dividend_yield_bps })), prices };
+}
+
+export function holdingsAt(date: string): typeof SEED_HOLDINGS {
+  const trades = generateSeed().transactions.filter(item => item.kind === "trade_buy");
+  return SEED_HOLDINGS.map(holding => {
+    const later = trades.filter(item => item.account_id === holding.account_id &&
+      item.merchant === holding.ticker && item.posted_on > date);
+    const quantity = later.reduce((total, item) => total - Number(item.description.split(" ")[1]), holding.quantity);
+    return { ...holding, quantity };
+  });
 }
