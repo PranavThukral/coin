@@ -1,0 +1,51 @@
+/* Coin design tokens: semantic values change together with the surface. */
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --background: #f7f6f2; --surface: #ffffff; --surface-soft: #eeeee9;
+  --foreground: #172925; --muted: #52615c; --border: #cbd2cb;
+  --accent: #315e50; --accent-ink: #ffffff;
+  --gain: #286447; --loss: #a23e3a; --warning: #805b12; --blocked: #a23e3a; --pending: #665092;
+  --chart-1: #315e50; --chart-2: #865244; --chart-3: #59538b; --chart-4: #376579; --chart-5: #80631e; --chart-6: #8b4d69;
+  --shadow-card: 0 8px 28px rgba(23, 41, 37, .07);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #141d1a; --surface: #202c27; --surface-soft: #2b3933;
+  --foreground: #eef3ed; --muted: #bdcbc0; --border: #52655a;
+  --accent: #a7d5bb; --accent-ink: #142820;
+  --gain: #a4d6ad; --loss: #ffb5ab; --warning: #e8ca80; --blocked: #ffb5ab; --pending: #d5c2f4;
+  --chart-1: #a7d5bb; --chart-2: #efb9a5; --chart-3: #cbc4ff; --chart-4: #a4d3e3; --chart-5: #e8ca80; --chart-6: #efb8ce;
+  --shadow-card: 0 8px 28px rgba(0, 0, 0, .25);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --background: #141d1a; --surface: #202c27; --surface-soft: #2b3933;
+    --foreground: #eef3ed; --muted: #bdcbc0; --border: #52655a;
+    --accent: #a7d5bb; --accent-ink: #142820;
+    --gain: #a4d6ad; --loss: #ffb5ab; --warning: #e8ca80; --blocked: #ffb5ab; --pending: #d5c2f4;
+    --chart-1: #a7d5bb; --chart-2: #efb9a5; --chart-3: #cbc4ff; --chart-4: #a4d3e3; --chart-5: #e8ca80; --chart-6: #efb8ce;
+    --shadow-card: 0 8px 28px rgba(0, 0, 0, .25);
+  }
+}
+@theme inline {
+  --color-background: var(--background); --color-surface: var(--surface); --color-surface-soft: var(--surface-soft);
+  --color-foreground: var(--foreground); --color-muted: var(--muted); --color-border: var(--border);
+  --color-accent: var(--accent); --color-accent-ink: var(--accent-ink);
+  --color-gain: var(--gain); --color-loss: var(--loss); --color-warning: var(--warning); --color-blocked: var(--blocked); --color-pending: var(--pending);
+  --color-chart-1: var(--chart-1); --color-chart-2: var(--chart-2); --color-chart-3: var(--chart-3); --color-chart-4: var(--chart-4); --color-chart-5: var(--chart-5); --color-chart-6: var(--chart-6);
+  --font-sans: var(--font-coin), sans-serif;
+  --radius-coin-sm: 8px; --radius-coin: 16px; --radius-coin-lg: 24px;
+  --shadow-coin: var(--shadow-card);
+  --spacing-coin-1: 4px; --spacing-coin-2: 8px; --spacing-coin-3: 12px; --spacing-coin-4: 16px; --spacing-coin-6: 24px; --spacing-coin-8: 32px; --spacing-coin-12: 48px;
+  --text-coin-display: 48px; --text-coin-display--line-height: 1.1;
+  --text-coin-heading: 30px; --text-coin-heading--line-height: 1.2;
+  --text-coin-title: 20px; --text-coin-title--line-height: 1.4;
+  --text-coin-body: 16px; --text-coin-body--line-height: 1.5;
+  --text-coin-small: 14px; --text-coin-small--line-height: 1.5;
+  --text-coin-caption: 12px; --text-coin-caption--line-height: 1.4;
+  --ease-coin: cubic-bezier(.2, 0, 0, 1);
+}
+:root { --duration-fast: 120ms; --duration-standard: 220ms; --duration-slow: 360ms; --ease-coin-motion: cubic-bezier(.2, 0, 0, 1); }
+.money { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
