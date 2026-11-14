@@ -1,0 +1,87 @@
+import { describe, expect, it } from "vitest";
+import { PGlite } from "@electric-sql/pglite";
+import { readFile } from "node:fs/promises";
+import { generateSeed } from "./generate";
+import { insertSeed, type Database } from "../seed";
+import { addDays, daysBetween, HISTORY_START, PERSONA, PLANTED_SUBSCRIPTION, PLANTED_TRANSACTIONS, SEED_ACCOUNTS, SEED_ANCHOR_DATE, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM, SEED_SECURITIES, TEMPLATE_SESSION_ID } from "../../src/contracts";
+
+const seed = generateSeed();
+describe("deterministic seed", () => {
+  it("matches pinned facts and planted rows", () => {
+    for (const pinned of SEED_ACCOUNTS) expect(seed.accounts.find(a => a.id === pinned.id)).toMatchObject(pinned);
+    expect(seed.bills).toEqual(SEED_BILLS); expect(seed.contacts).toEqual(SEED_CONTACTS);
+    expect(seed.holdings).toEqual(SEED_HOLDINGS); expect(seed.room).toEqual(SEED_ROOM);
+    for (const row of PLANTED_TRANSACTIONS) expect(seed.transactions.find(t => t.id === row.id)).toMatchObject(row);
+    for (const s of SEED_SECURITIES) {
+      expect(seed.securities.find(x => x.ticker === s.ticker)).toMatchObject({ name: s.name, kind: s.kind, sector: s.sector, dividend_yield_bps: s.dividend_yield_bps });
+      expect(seed.prices.filter(p => p.ticker === s.ticker).at(-1)?.close_cents).toBe(s.as_of_close_cents);
+    }
+    const charges = seed.transactions.filter(t => t.merchant === PLANTED_SUBSCRIPTION.merchant);
+    expect(charges.find(t => t.posted_on === "2026-09-03")?.amount_cents).toBe(-1699);
+    expect(charges.find(t => t.posted_on === "2026-10-03")?.amount_cents).toBe(-2299);
+  });
+  it("reconciles every running balance and respects limits", () => {
+    for (const account of seed.accounts) {
+      let balance = account.opening_balance_cents; expect(balance, account.id).toBeGreaterThanOrEqual(0);
+      for (const t of seed.transactions.filter(t => t.account_id === account.id)) {
+        balance += account.type === "credit_card" ? -t.amount_cents : t.amount_cents;
+        if (account.type !== "credit_card") expect(balance, `${t.posted_on} ${t.id}`).toBeGreaterThanOrEqual(0);
+        if (account.id === "acc_card") { expect(balance, `${t.posted_on} ${t.id}`).toBeLessThanOrEqual(account.limit_cents!); expect(balance, `${t.posted_on} ${t.id}`).toBeGreaterThanOrEqual(0); }
+      }
+      expect(balance).toBe(account.balance_cents);
+    }
+  });
+  it("pairs transfers and card bill payments", () => {
+    const groups = new Map<string, typeof seed.transactions>();
+    for (const t of seed.transactions.filter(t => t.transfer_group_id)) groups.set(t.transfer_group_id!, [...(groups.get(t.transfer_group_id!) ?? []), t]);
+    for (const rows of groups.values()) {
+      expect(rows).toHaveLength(2); expect(rows[0].amount_cents + rows[1].amount_cents).toBe(0);
+      expect(rows[0].posted_on).toBe(rows[1].posted_on);
+      if (rows.some(t => t.kind === "card_payment")) { expect(rows.map(t => t.kind).sort()).toEqual(["card_payment", "card_payment_out"]); expect(rows.every(t => t.description.includes("bill_card"))).toBe(true); }
+    }
+    expect([...groups.values()].filter(rows => rows.some(t => t.kind === "card_payment"))).toHaveLength(24);
+  });
+  it("has bounded dates, stable output, sufficient history and relative timing", () => {
+    expect(generateSeed()).toEqual(seed); expect(seed.transactions.length).toBeGreaterThanOrEqual(1500); expect(seed.transactions.length).toBeLessThanOrEqual(3000);
+    expect(seed.transactions.every(t => t.posted_on >= HISTORY_START && t.posted_on <= SEED_ANCHOR_DATE)).toBe(true);
+    expect(seed.bills.every(b => b.due_date > SEED_ANCHOR_DATE)).toBe(true);
+    expect(daysBetween(SEED_ANCHOR_DATE, seed.bills.find(b => b.id === "bill_hydro")!.due_date)).toBe(3);
+    expect(daysBetween(SEED_ANCHOR_DATE, seed.bills.find(b => b.id === "bill_card")!.due_date)).toBe(9);
+    expect(daysBetween(SEED_ANCHOR_DATE, seed.bills.find(b => b.id === "bill_rent")!.due_date)).toBe(16);
+    const payroll = seed.transactions.filter(t => t.kind === "income");
+    expect(payroll.every(t => t.amount_cents === PERSONA.pay.net_cents && daysBetween(PERSONA.pay.anchor_payday, t.posted_on) % 14 === 0 && new Date(`${t.posted_on}T00:00:00Z`).getUTCDay() === 5)).toBe(true);
+    expect(addDays(PERSONA.pay.anchor_payday, 14)).toBe(addDays(SEED_ANCHOR_DATE, 5)); expect(addDays(PERSONA.pay.anchor_payday, 28)).toBe(addDays(SEED_ANCHOR_DATE, 19));
+    for (const s of SEED_SECURITIES) {
+      const prices = seed.prices.filter(p => p.ticker === s.ticker);
+      expect(prices.every(p => p.date >= HISTORY_START && p.date <= SEED_ANCHOR_DATE && ![0, 6].includes(new Date(`${p.date}T00:00:00Z`).getUTCDay()))).toBe(true);
+      const expected = Array.from({length: daysBetween(HISTORY_START, SEED_ANCHOR_DATE) + 1}, (_, i) => addDays(HISTORY_START, i)).filter(d => ![0, 6].includes(new Date(`${d}T00:00:00Z`).getUTCDay()));
+      expect(prices.map(p => p.date)).toEqual(expected);
+    }
+  });
+  it("seeds and clones shifted rows in PGlite, and can reseed", async () => {
+    const pg = new PGlite();
+    try {
+      await pg.exec(await readFile("db/migrations/0001_init.sql", "utf8"));
+      const db: Database = { query: (sql, params) => pg.query(sql, params), transaction: fn => pg.transaction(tx => fn({ query: (sql, params) => tx.query(sql, params) })) };
+      await insertSeed(db, seed); await insertSeed(db, seed);
+      const sid = "00000000-0000-4000-8000-000000000001";
+      await pg.query("insert into sessions (id, today_date, date_offset_days) values ($1, $2, $3)", [sid, "2027-01-05", 51]);
+      await pg.query("select clone_template($1)", [sid]);
+      for (const table of ["accounts", "transactions", "holdings", "bills", "contacts", "room"]) {
+        const result = await pg.query<{ count: number }>(`select count(*)::int as count from ${table} where session_id = $1`, [sid]);
+        const original = await pg.query<{ count: number }>(`select count(*)::int as count from ${table} where session_id = $1`, [TEMPLATE_SESSION_ID]);
+        expect(result.rows).toEqual(original.rows);
+      }
+      await insertSeed(db, seed); // Existing cloned holdings must not prevent a reseed.
+      const shifted = await pg.query<{ due: string; year: number }>("select b.due_date::text as due, r.year from bills b join room r on r.session_id = b.session_id and r.account_type = 'tfsa' where b.session_id = $1 and b.id = 'bill_hydro'", [sid]);
+      expect(shifted.rows[0]).toEqual({ due: "2027-01-08", year: 2027 });
+      const price = await pg.query<{ date: string }>("select date::text from session_prices($1) where ticker = 'NRTH.CX' order by date desc limit 1", [sid]);
+      expect(price.rows[0].date).toBe(addDays(seed.prices.filter(p => p.ticker === "NRTH.CX").at(-1)!.date, 51));
+    } finally { await pg.close(); }
+  }, 30000);
+});
+
+
+
+
+
