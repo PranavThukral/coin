@@ -152,6 +152,4 @@ export const chartSeries = [
   { name: "Berry", value: 50 },
 ];
 
-export function money(cents: number): string {
-  return new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(cents / 100);
-}
+export { money } from "../../../lib/format";

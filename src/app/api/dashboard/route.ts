@@ -7,7 +7,7 @@ import { runReadTool } from "../../../server/tools/read";
 const NET_WORTH_CHART: ChartRequest = {
   source: "net_worth_over_time",
   title: "Net worth",
-  kind: null,
+  kind: "line",
   from: null,
   to: null,
   compare_from: null,
@@ -29,15 +29,22 @@ const RECENT_TRANSACTIONS = {
 
 export function GET(request: Request) {
   return withSession(request, async ({ db, sessionId }) => {
-    const [accounts, recent, netWorth, outflow] = await Promise.all([
+    const [session] = await db.query<{ today_date: string }>(
+      "select today_date from sessions where id = $1",
+      [sessionId],
+    );
+    const [accounts, recent, upcoming, netWorth, outflow] = await Promise.all([
       runReadTool(db, sessionId, "get_accounts", {}),
       runReadTool(db, sessionId, "get_transactions", RECENT_TRANSACTIONS),
+      runReadTool(db, sessionId, "get_upcoming", { days: 14 }),
       buildChart(db, sessionId, NET_WORTH_CHART),
       dailyOutflow(db, sessionId),
     ]);
     return Response.json({
+      today: session.today_date,
       accounts,
       recent_transactions: recent,
+      upcoming,
       net_worth: netWorth,
       daily_outflow: outflow,
     });
