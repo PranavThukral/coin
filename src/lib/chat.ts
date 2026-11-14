@@ -34,7 +34,7 @@ const nextId = (prefix: string) => `${prefix}-${Date.now()}-${++localId}`;
 export function addUserMessage(state: ChatState, text: string): ChatState {
   const user: ChatMessage = { id: nextId("u"), role: "user", text, parts: [], error: null, done: true };
   const coin: ChatMessage = { id: nextId("c"), role: "coin", text: "", parts: [], error: null, done: false };
-  return { messages: [...state.messages, user, coin], status: "Thinking…", busy: true };
+  return { messages: [...state.messages, user, coin], status: "Thinking\u2026", busy: true };
 }
 
 function updateLastCoin(state: ChatState, update: (message: ChatMessage) => ChatMessage): ChatState {
@@ -66,6 +66,18 @@ export function applyEvent(state: ChatState, event: ChatEvent): ChatState {
     case "done":
       return updateLastCoin({ ...state, status: null, busy: false }, (m) => ({ ...m, done: true }));
   }
+}
+
+export const REPLY_CUT_OFF = "The reply was cut off. Try asking again.";
+
+/**
+ * The stream has ended. If no "done" or "error" event closed the turn (the
+ * connection dropped, or the server ran out of time), close it here so the
+ * composer unlocks and the visitor sees why the reply stopped.
+ */
+export function endTurn(state: ChatState): ChatState {
+  if (!state.busy) return state;
+  return applyEvent(state, { type: "error", code: "model_error", message: REPLY_CUT_OFF });
 }
 
 /** "Use $X instead": the server's request text, then Coin's new card. */

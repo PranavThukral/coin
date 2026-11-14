@@ -6,6 +6,30 @@ import { holdingsTimeline, priceIndex } from "./history";
 import * as q from "../db/queries";
 import type { Tx } from "../db/types";
 
+/** The ledger and price history cover the two years before the session's today. */
+const HISTORY_DAYS = 730;
+
+/**
+ * Keeps a requested date inside the history that exists. The model picks
+ * chart and report ranges; a range starting in 1990 would otherwise produce
+ * hundreds of empty points.
+ */
+export function clampToHistory(date: string, today: string): string {
+  const earliest = addDays(today, -HISTORY_DAYS);
+  if (date < earliest) return earliest;
+  if (date > today) return today;
+  return date;
+}
+
+/** Each ticker's share of everything invested, summed across the accounts that hold it. */
+export function tickerWeights(holdings: HoldingView[]): Map<string, number> {
+  const weights = new Map<string, number>();
+  for (const holding of holdings) {
+    weights.set(holding.ticker, (weights.get(holding.ticker) ?? 0) + holding.weight_of_portfolio);
+  }
+  return weights;
+}
+
 export async function holdingViews(db: Tx, sid: string): Promise<HoldingView[]> {
   const [hs, ps, session] = await Promise.all([
     q.holdings(db, sid), q.prices(db, sid), q.sessionInfo(db, sid),

@@ -10,6 +10,8 @@ function createSql(url: string): Sql {
   return postgres(url, {
     max: 5,
     prepare: false, // works behind Neon / pgbouncer transaction pooling
+    idle_timeout: 20, // seconds; a frozen serverless instance shouldn't hold connections open
+    connect_timeout: 10, // seconds; fail fast instead of hanging a request on a cold database
     types: {
       int8: { to: PG_TYPE.int8, from: [PG_TYPE.int8], serialize: String, parse: parseSafeInt },
       date: { to: PG_TYPE.date, from: [PG_TYPE.date], serialize: String, parse: (v: string) => v },

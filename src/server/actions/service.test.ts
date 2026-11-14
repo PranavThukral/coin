@@ -1,7 +1,9 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { torontoToday } from "../../contracts";
 import { seededTestDb, type SeededTestDb } from "../db/test-db";
-import { approve, confirmRecipient, dismiss, executeNow, proposeAction, settleDueActions, undo } from "./service";
+import {
+  approve, confirmRecipient, dismiss, executeNow, proposeAction, settleDueActions, undo, SETTLEMENT_FAILED_MESSAGE,
+} from "./service";
 
 let fixture: SeededTestDb;
 const now = new Date();
@@ -66,6 +68,22 @@ describe("action lifecycle", () => {
     await run(sid, "Sell 1 shares CAEQ.CX in TFSA", { type: "trade", account_id: "acc_tfsa", side: "sell", ticker: "CAEQ.CX", quantity: 1, rationale: "" });
     const [after] = await fixture.db.query<{ quantity: number; avg_cost_cents: number }>("select quantity, avg_cost_cents from holdings where session_id = $1 and account_id = 'acc_tfsa' and ticker = 'CAEQ.CX'", [sid]);
     expect(after).toEqual({ quantity: holding.quantity - 1, avg_cost_cents: holding.avg_cost_cents });
+  });
+
+  it("removes the holding when every share is sold, and keeps the cash", async () => {
+    const sid = await fixture.newSession();
+    const card = await run(sid, "Sell 150 shares of ORCA.CX in my non-registered account", {
+      type: "trade", account_id: "acc_nonreg", side: "sell", ticker: "ORCA.CX", quantity: 150, rationale: "",
+    });
+    expect(card.status).toBe("executed");
+    const left = await fixture.db.query(
+      "select ticker from holdings where session_id = $1 and account_id = 'acc_nonreg' and ticker = 'ORCA.CX'", [sid],
+    );
+    expect(left).toEqual([]);
+    const [account] = await fixture.db.query<{ balance_cents: number }>(
+      "select balance_cents from accounts where session_id = $1 and id = 'acc_nonreg'", [sid],
+    );
+    expect(account.balance_cents).toBe(312_075 + card.amount_cents!);
   });
 
   it("executes a confirmed new-recipient transfer", async () => {
@@ -219,5 +237,37 @@ describe("action lifecycle", () => {
     const other = await fixture.newSession();
     const full = await proposal(other, "Pay my card in full from chequing", { type: "bill_payment", from_account_id: "acc_chequing", bill_id: "bill_card", amount_cad: 4912.38, rationale: "" });
     expect(full.max_passing_amount_cents).toBe(234012);
+  });
+  it("closes an action whose settlement throws, and settles the others", async () => {
+    const sid = await fixture.newSession();
+    const move = (amount: number) => ({
+      type: "transfer", from_account_id: "acc_hisa", to_account_id: "acc_chequing", amount_cad: amount, rationale: "",
+    });
+    const broken = await proposal(sid, "Move $10 from savings to chequing", move(10));
+    const fine = await proposal(sid, "Move $20 from savings to chequing", move(20));
+    await approve(fixture.db, sid, broken.action_id, now);
+    await approve(fixture.db, sid, fine.action_id, now);
+    // A ledger row already holding the id the executor will use makes its insert fail.
+    await fixture.db.query(
+      `insert into transactions (session_id, id, account_id, posted_on, amount_cents, merchant, description, category, kind)
+       values ($1, $2, 'acc_hisa', $3, -1, 'x', 'x', 'other', 'purchase')`,
+      [sid, `txn_act_${broken.action_id.slice(0, 8)}_1`, fixture.today],
+    );
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    const afterWindow = new Date(now.getTime() + 61_000);
+
+    const cards = await settleDueActions(fixture.db, sid, afterWindow);
+
+    logged.mockRestore();
+    const byId = new Map(cards.map((card) => [card.action_id, card]));
+    expect(byId.get(broken.action_id)?.status).toBe("blocked");
+    expect(byId.get(broken.action_id)?.primary_message).toBe(SETTLEMENT_FAILED_MESSAGE);
+    expect(byId.get(fine.action_id)?.status).toBe("executed");
+    const [savings] = await fixture.db.query<{ balance_cents: number }>(
+      "select balance_cents from accounts where session_id = $1 and id = 'acc_hisa'", [sid],
+    );
+    expect(savings.balance_cents).toBe(2_450_000 - 2_000);
+    // Nothing is left pending, so later requests are not affected.
+    expect(await settleDueActions(fixture.db, sid, afterWindow)).toEqual([]);
   });
 });

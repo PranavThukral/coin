@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ActionCard, ChatEvent } from "../contracts";
-import { addUserMessage, applyEvent, initialChat, readEventStream, replaceCard } from "./chat";
+import { addUserMessage, applyEvent, endTurn, initialChat, readEventStream, replaceCard, REPLY_CUT_OFF } from "./chat";
 
 const card = (status: ActionCard["status"]) => ({ action_id: "a1", status }) as ActionCard;
 
@@ -51,6 +51,27 @@ describe("chat reducer", () => {
     state = replaceCard(state, card("pending_undo"));
     const part = state.messages[1].parts[0];
     expect(part.kind === "card" && part.card.status).toBe("pending_undo");
+  });
+});
+
+describe("a stream that ends", () => {
+  it("without a done event: unlocks the composer and says the reply was cut off", () => {
+    let state = addUserMessage(initialChat, "Where did my money go?");
+    state = applyEvent(state, { type: "text_delta", text: "Most of it went to" });
+    state = endTurn(state);
+    expect(state.busy).toBe(false);
+    expect(state.status).toBeNull();
+    expect(state.messages[1].text).toBe("Most of it went to");
+    expect(state.messages[1].error).toBe(REPLY_CUT_OFF);
+    expect(state.messages[1].done).toBe(true);
+  });
+
+  it("after a done event: changes nothing", () => {
+    let state = addUserMessage(initialChat, "hi");
+    state = applyEvent(state, { type: "text_delta", text: "Hello." });
+    state = applyEvent(state, { type: "done" });
+    expect(endTurn(state)).toBe(state);
+    expect(state.messages[1].error).toBeNull();
   });
 });
 

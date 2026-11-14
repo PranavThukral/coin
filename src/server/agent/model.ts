@@ -68,11 +68,14 @@ function toProviderInput(input: TurnInput[]): ResponseInput {
   );
 }
 
+/** The SDK default is ten minutes, far longer than a serverless request may run. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export function createAgentModel(): AgentModel {
   const modelId = process.env.OPENAI_MODEL;
   const apiKey = process.env.OPENAI_API_KEY;
   if (!modelId || !apiKey) throw new Error("Model configuration is missing");
-  const client = new OpenAI({ apiKey });
+  const client = new OpenAI({ apiKey, timeout: REQUEST_TIMEOUT_MS, maxRetries: 1 });
   const tools = toolDefinitions();
 
   return {
@@ -95,7 +98,8 @@ export function createAgentModel(): AgentModel {
         if (event.type === "response.output_item.done" && event.item.type === "function_call") {
           result.calls.push({ id: event.item.call_id, name: event.item.name, arguments: event.item.arguments });
         }
-        if (event.type === "response.completed") {
+        // "incomplete" is a reply cut off at the output cap: still billed, so still counted.
+        if (event.type === "response.completed" || event.type === "response.incomplete") {
           result.responseId = event.response.id;
           result.inputTokens = event.response.usage?.input_tokens ?? 0;
           result.outputTokens = event.response.usage?.output_tokens ?? 0;

@@ -236,13 +236,42 @@ export async function executeNow(
   return settleOne(db, sessionId, actionId, now);
 }
 
+export const SETTLEMENT_FAILED_MESSAGE = "Coin couldn't complete this, so nothing moved. Ask again to retry.";
+
+/**
+ * Settlement threw, so its transaction rolled back and nothing moved. The
+ * action is closed as blocked: settlement runs at the start of every request,
+ * and one action that keeps failing would otherwise fail all of them.
+ */
+async function closeFailedSettlement(db: Db, sessionId: string, actionId: string): Promise<ActionCard | null> {
+  return db.transaction(async (tx) => {
+    const rows = await tx.query<ActionRow>(
+      `update actions set status = 'blocked', blocked_at_execution = true, primary_message = $3
+       where session_id = $1 and id = $2 and status = 'pending_undo' returning *`,
+      [sessionId, actionId, SETTLEMENT_FAILED_MESSAGE],
+    );
+    if (!rows.length) return null;
+    await audit(tx, sessionId, actionId, "system", "blocked_at_execution");
+    return toActionCard(tx, sessionId, rows[0]);
+  });
+}
+
 export async function settleDueActions(db: Db, sessionId: string, now: Date): Promise<ActionCard[]> {
   const rows = await db.query<{ id: string }>(
     `select id from actions where session_id = $1 and status = 'pending_undo'
      and execute_at <= $2 order by execute_at, id`, [sessionId, now.toISOString()],
   );
   const cards: ActionCard[] = [];
-  for (const row of rows) cards.push(await settleOne(db, sessionId, row.id, now));
+  for (const row of rows) {
+    let card: ActionCard | null;
+    try {
+      card = await settleOne(db, sessionId, row.id, now);
+    } catch (error) {
+      console.error("Settling an action failed", row.id, error);
+      card = await closeFailedSettlement(db, sessionId, row.id);
+    }
+    if (card) cards.push(card);
+  }
   return cards;
 }
 

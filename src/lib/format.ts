@@ -9,7 +9,7 @@ export function money(cents: number): string {
 
 /** "-$4,912.38" with a true minus sign; "+$12.00" when asked for a sign. */
 export function signedMoney(cents: number, showPlus = false): string {
-  if (cents < 0) return `−${CAD.format(-cents / 100)}`;
+  if (cents < 0) return `\u2212${CAD.format(-cents / 100)}`;
   return showPlus ? `+${CAD.format(cents / 100)}` : CAD.format(cents / 100);
 }
 

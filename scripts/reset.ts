@@ -1,9 +1,10 @@
-import "dotenv/config";
+import { loadScriptEnv } from "./env";
 import postgres from "postgres";
 import { migrate } from "./migrate";
 import { seedDatabase } from "./seed";
 
 async function reset() {
+  loadScriptEnv();
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is required");
   const host = new URL(url).hostname.toLowerCase();

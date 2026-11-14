@@ -112,6 +112,9 @@ async function trade(
   } else {
     await tx.query(`update holdings set quantity = quantity - $4
       where session_id = $1 and account_id = $2 and ticker = $3`, [sid, p.account_id, p.ticker, p.quantity]);
+    // A position sold in full is no longer a holding; don't leave a "0 shares" row behind.
+    await tx.query(`delete from holdings
+      where session_id = $1 and account_id = $2 and ticker = $3 and quantity = 0`, [sid, p.account_id, p.ticker]);
   }
   await ledger(tx, sid, id, today, [{
     account: p.account_id,
@@ -122,15 +125,6 @@ async function trade(
     description: tradeDescription(p.side, p.quantity, p.ticker),
     group: null,
   }]);
-}
-
-async function applyEffects(
-  tx: Tx, sid: string, id: string, today: string, p: ActionProposal,
-): Promise<void> {
-  if (p.type === "transfer") return transfer(tx, sid, id, today, p);
-  if (p.type === "bill_payment") return payment(tx, sid, id, today, p);
-  if (p.type === "trade") return trade(tx, sid, id, today, p);
-  return etransfer(tx, sid, id, today, p);
 }
 
 async function etransfer(
@@ -151,6 +145,22 @@ async function etransfer(
   const label = `Interac e-Transfer to ${name}`;
   await ledger(tx, sid, id, today, [{ account: p.from_account_id, amount: -p.amount_cents,
     kind: "etransfer_out", category: "gifts_social", label, group: null }]);
+}
+
+/** Moves the money for one action. Only called after the rules passed inside this transaction. */
+async function applyEffects(
+  tx: Tx, sid: string, id: string, today: string, p: ActionProposal,
+): Promise<void> {
+  switch (p.type) {
+    case "transfer":
+      return transfer(tx, sid, id, today, p);
+    case "bill_payment":
+      return payment(tx, sid, id, today, p);
+    case "trade":
+      return trade(tx, sid, id, today, p);
+    case "etransfer":
+      return etransfer(tx, sid, id, today, p);
+  }
 }
 
 function accountsTouchedBy(proposal: ActionProposal): string[] {
@@ -189,11 +199,14 @@ export async function settleOne(
       "select id from accounts where session_id = $1 and id = any($2::text[]) order by id for update",
       [sessionId, ids],
     );
+    // Fresh balances, bills, room and prices, read under the locks above.
     const context = await loadRuleContext(tx, sessionId, row.request_message_id, row.id);
     const evaluation = evaluateRules(proposal, context);
     const confirmed = !evaluation.requires_second_confirmation || row.second_confirmed_at !== null;
     const allowed = evaluation.allowed && confirmed;
-    if (allowed) await applyEffects(tx, sessionId, actionId, context.today, proposal);
+    if (allowed) {
+      await applyEffects(tx, sessionId, actionId, context.today, proposal);
+    }
     const updated = await recordStatus(tx, sessionId, actionId, evaluation, allowed, now);
     await audit(tx, sessionId, actionId, "system", allowed ? "executed" : "blocked_at_execution");
     return toActionCard(tx, sessionId, updated);
