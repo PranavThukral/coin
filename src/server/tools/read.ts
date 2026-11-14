@@ -59,11 +59,14 @@ export async function runReadTool(db: Tx, sid: string, name: ReadName, input: un
     }
     case "find_recurring_changes": {
       const p = ToolInputs.find_recurring_changes.parse(input);
-      const start = addDays(today, -p.lookback_months * 31);
+      // Detecting a price change needs history before it, so always analyse a
+      // year; report only changes that happened inside the requested window.
+      const historyStart = addDays(today, -Math.max(p.lookback_months, 12) * 31);
+      const windowStart = addDays(today, -p.lookback_months * 31);
       const rows = (await q.transactions(db, sid)).filter(t =>
-        t.kind === "purchase" && t.posted_on >= start && t.posted_on <= today,
+        t.kind === "purchase" && t.posted_on >= historyStart && t.posted_on <= today,
       );
-      return wrap(recurringChanges(rows, today));
+      return wrap(recurringChanges(rows, today).filter(change => change.since >= windowStart));
     }
     case "get_holdings": {
       const p = ToolInputs.get_holdings.parse(input);

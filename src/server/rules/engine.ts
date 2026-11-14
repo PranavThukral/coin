@@ -58,8 +58,9 @@ function findAccount(ctx: RuleContext, id: string) {
   return ctx.accounts.find((account) => account.id === id);
 }
 
+/** "2,340.12": RULE_MESSAGES already supply the dollar sign. */
 function money(cents: number): string {
-  return (Math.max(0, cents) / 100).toFixed(2);
+  return (Math.max(0, cents) / 100).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function word(text: string, value: string): boolean {

@@ -132,7 +132,7 @@ describe('specific limit messages', () => {
   it('explains a card overpayment', () => {
     const ctx = makeContext({ user_message: { id: 'm', text: 'pay $6000 on my card' } });
     ctx.accounts = ctx.accounts.map(a => a.id === 'acc_chequing' ? { ...a, balance_cents: 2000000 } : a);
-    expect(evaluateRules(pay(600000, 'bill_card'), ctx).checks[4].message).toContain('only owe $4912.38');
+    expect(evaluateRules(pay(600000, 'bill_card'), ctx).checks[4].message).toContain('only owe $4,912.38');
   });
   it('explains a cash-limited buy', () => {
     const result = evaluateRules(trade(7), makeContext({ user_message: { id: 'm', text: 'buy 7 shares NRTH.CX in tfsa' } }));
