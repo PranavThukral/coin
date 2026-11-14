@@ -1,3 +1,4 @@
+import { AppError } from "../errors";
 import {
   RULE_LIMITS,
   type Account,
@@ -23,7 +24,7 @@ export async function dailyOutflow(db: Tx, sessionId: string): Promise<DailyOutf
     "select today_date from sessions where id = $1 and not is_template",
     [sessionId],
   );
-  if (!sessions[0]) throw new Error("Session not found");
+  if (!sessions[0]) throw new AppError("not_found", "Session not found");
   const items = await db.query<OutflowRow>(
     `select a.id as action_id, a.type, (a.payload->>'amount_cents')::bigint as amount_cents,
        a.status, case when a.type = 'bill_payment' then coalesce(b.payee, a.payload->>'bill_id')
@@ -60,7 +61,7 @@ export async function loadRuleContext(
     "select id, content from messages where id = $1 and session_id = $2 and role = 'user'",
     [messageId, sessionId],
   );
-  if (!messages[0]) throw new Error("User message not found");
+  if (!messages[0]) throw new AppError("not_found", "User message not found");
   const accounts = await db.query<Account>("select * from accounts where session_id = $1", [sessionId]);
   const bills = await db.query<Bill>("select * from bills where session_id = $1", [sessionId]);
   const contacts = await db.query<Contact>("select * from contacts where session_id = $1", [sessionId]);

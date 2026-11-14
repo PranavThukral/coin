@@ -89,8 +89,8 @@ describe("action lifecycle", () => {
       amount_cad: 1, rationale: "",
     });
     expect((await dismiss(fixture.db, sid, card.action_id)).status).toBe("cancelled");
-    await expect(dismiss(fixture.db, sid, card.action_id)).rejects.toThrow("Action is not proposed");
-    await expect(approve(fixture.db, sid, card.action_id, now)).rejects.toThrow("Action is not proposed");
+    await expect(dismiss(fixture.db, sid, card.action_id)).rejects.toThrow("no longer waiting for approval");
+    await expect(approve(fixture.db, sid, card.action_id, now)).rejects.toThrow("no longer waiting for approval");
     const [action] = await fixture.db.query<{ cancelled_at: string | null }>(
       "select cancelled_at from actions where session_id = $1 and id = $2", [sid, card.action_id],
     );

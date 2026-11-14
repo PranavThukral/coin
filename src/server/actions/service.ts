@@ -1,3 +1,4 @@
+import { AppError } from "../errors";
 import {
   ConfirmRecipientBody, normalizeProposal, Proposal, RULE_LIMITS,
   type ActionCard, type ActionStatus, type ActionType, type CheckResult, type RuleEvaluation,
@@ -28,7 +29,7 @@ export async function lockSession(db: Tx, sessionId: string): Promise<void> {
   const rows = await db.query(
     "select id from sessions where id = $1 and not is_template for update", [sessionId],
   );
-  if (!rows.length) throw new Error("Session not found");
+  if (!rows.length) throw new AppError("not_found", "Session not found");
 }
 
 export async function getAction(
@@ -38,7 +39,7 @@ export async function getAction(
   const rows = await db.query<ActionRow>(
     `select * from actions where session_id = $1 and id = $2${suffix}`, [sessionId, actionId],
   );
-  if (!rows[0]) throw new Error("Action not found");
+  if (!rows[0]) throw new AppError("not_found", "Action not found");
   return rows[0];
 }
 
@@ -169,7 +170,7 @@ export async function confirmRecipient(
     const p = Proposal.parse(row.payload);
     if (row.status !== "proposed" || !row.requires_second_confirmation
       || p.type !== "etransfer" || p.recipient.kind !== "new") {
-      throw new Error("Action cannot confirm recipient");
+      throw new AppError("conflict", "This action does not need a recipient confirmation");
     }
     p.recipient.email = validated;
     const context = await loadRuleContext(tx, sessionId, row.request_message_id, row.id);
@@ -190,11 +191,11 @@ export async function approve(db: Db, sessionId: string, actionId: string, now: 
   return db.transaction(async (tx) => {
     await lockSession(tx, sessionId);
     const row = await getAction(tx, sessionId, actionId, true);
-    if (row.status !== "proposed") throw new Error("Action is not proposed");
+    if (row.status !== "proposed") throw new AppError("conflict", "This action is no longer waiting for approval");
     const context = await loadRuleContext(tx, sessionId, row.request_message_id, row.id);
     const evaluation = evaluateRules(Proposal.parse(row.payload), context);
     if (!evaluation.allowed || (evaluation.requires_second_confirmation && !row.second_confirmed_at)) {
-      throw new Error(evaluation.primary_message ?? "Recipient confirmation required");
+      throw new AppError("conflict", evaluation.primary_message ?? "Confirm the new recipient first");
     }
     await saveEvaluation(tx, sessionId, actionId, evaluation);
     const executeAt = new Date(now.getTime() + RULE_LIMITS.undo_window_seconds * 1000);
@@ -203,7 +204,7 @@ export async function approve(db: Db, sessionId: string, actionId: string, now: 
        where session_id = $1 and id = $2 and status = 'proposed' returning *`,
       [sessionId, actionId, now.toISOString(), executeAt.toISOString()],
     );
-    if (!updated.length) throw new Error("Action is not proposed");
+    if (!updated.length) throw new AppError("conflict", "This action is no longer waiting for approval");
     await audit(tx, sessionId, actionId, "user", "approved");
     return toActionCard(tx, sessionId, updated[0]);
   });
@@ -218,7 +219,7 @@ export async function undo(db: Db, sessionId: string, actionId: string): Promise
        where session_id = $1 and id = $2 and status = 'pending_undo' returning *`,
       [sessionId, actionId],
     );
-    if (!rows.length) throw new Error("Action is not pending");
+    if (!rows.length) throw new AppError("conflict", "This action is no longer waiting to execute");
     await audit(tx, sessionId, actionId, "user", "undone");
     return toActionCard(tx, sessionId, rows[0]);
   });
@@ -233,7 +234,7 @@ export async function dismiss(db: Db, sessionId: string, actionId: string): Prom
        where session_id = $1 and id = $2 and status = 'proposed' returning *`,
       [sessionId, actionId],
     );
-    if (!rows.length) throw new Error("Action is not proposed");
+    if (!rows.length) throw new AppError("conflict", "This action is no longer waiting for approval");
     await audit(tx, sessionId, actionId, "user", "dismissed");
     return toActionCard(tx, sessionId, rows[0]);
   });
