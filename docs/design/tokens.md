@@ -1,4 +1,4 @@
-# Coin / design tokens ? approval sheet
+# Coin / design tokens - approval sheet
 
 Coin feels like a quiet workspace for understanding money, with warm mineral surfaces and generous spacing. Grounded evergreen gives the assistant a recognizable presence while the numbers stay foremost. Clear labels, restrained elevation and deliberate pauses make consequential actions easy to review.
 
@@ -30,7 +30,7 @@ Values are light / dark. Surface colors form a role-based neutral scale; foregro
 | chart-5 / Ochre | #80631e | #e8ca80 | category 5 |
 | chart-6 / Berry | #8b4d69 | #efb8ce | category 6 |
 
-**Contrast:** WCAG relative-luminance calculations against `surface`: foreground 15.21:1 / 12.87:1; muted 6.52 / 8.59; accent 7.37 / 8.88; gain 6.99 / 8.82; loss and blocked 6.39 / 8.58; warning 6.13 / 9.09; pending 6.71 / 8.86 (light / dark). Chart 1?6 against surface: 7.37, 6.36, 6.92, 6.36, 5.64, 6.24 / 8.88, 8.38, 8.88, 8.96, 9.09, 8.56. These exceed AA 4.5:1 for normal text and 3:1 for meaningful graphics on that surface. Chart categories also need labels or patterns; colour alone is not identification. Border is decorative, not a text colour.
+**Contrast:** WCAG relative-luminance calculations against `surface`: foreground 15.21:1 / 12.87:1; muted 6.52 / 8.59; accent 7.37 / 8.88; gain 6.99 / 8.82; loss and blocked 6.39 / 8.58; warning 6.13 / 9.09; pending 6.71 / 8.86 (light / dark). Chart 1-6 against surface: 7.37, 6.36, 6.92, 6.36, 5.64, 6.24 / 8.88, 8.38, 8.88, 8.96, 9.09, 8.56. These exceed AA 4.5:1 for normal text and 3:1 for meaningful graphics on that surface. Chart categories also need labels or patterns; colour alone is not identification. Border is decorative, not a text colour.
 
 ## Type and rhythm
 
@@ -44,7 +44,7 @@ Spacing: 4, 8, 12, 16, 24, 32, 48 px. Radii: 8 px controls/insets, 16 px cards, 
 - **Balance header:** small contextual label above a large, tabular balance; secondary change includes both sign and descriptive text.
 - **Coin message:** a small Coin circle anchors a concise response on a soft surface, with enough line spacing for scanning.
 - **Chart card:** title, time context, labelled marks and legend on a surface card; never rely on colour alone.
-- **Approval card:** amount and from/to are always prominent. Proposed offers Approve and Cancel; a proposed action needing second confirmation asks for the recipient email before approval. Blocked shows a labelled warning and, when provided by the contract, a maximum passing amount as ?Use $2,340.12 instead?. Pending shows Undo, Execute now, and the 60-second ring; executed shows a check and status; cancelled shows its status. The preview is illustrative and controls do not execute actions.
+- **Approval card:** amount and from/to are always prominent. Proposed offers Approve and Cancel; a proposed action needing second confirmation asks for the recipient email before approval. Blocked shows a labelled warning and, when provided by the contract, a maximum passing amount as "Use $2,340.12 instead". Pending shows Undo, Execute now, and the 60-second ring; executed shows a check and status; cancelled shows its status. The preview is illustrative and controls do not execute actions.
 - **Check list:** each rule check uses a clear pass, flag or fail label and corresponding icon, with explanation for flags and failures; never colour alone.
 - **Collapsed Coin circle:** a small evergreen circle with a high-contrast C, a visible focus state and an accessible name in an interactive implementation.
 - **Daily outflow:** labelled meter states paid out today and the $5,000 limit; include pending and executed bill payments and e-transfers.

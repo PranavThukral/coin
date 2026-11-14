@@ -1,40 +1,271 @@
-import type { ActionCard, ActionStatus } from "../../../contracts";
+// Design token review page (dev only). Renders the whole sheet in light and
+// dark so Pranav can approve Coin's look before any product screen is built.
+import { ApprovalCardPreview } from "./approval-card";
+import { chartSeries, colourRoles, exampleCards, money, outflow } from "./preview-data";
 
-const roles = [
-  ["background", "Canvas"], ["surface", "Cards"], ["surface-soft", "Inset surfaces"], ["foreground", "Primary text"], ["muted", "Secondary text"], ["border", "Dividers"], ["accent", "Coin / primary action"], ["gain", "Gain"], ["loss", "Loss + label"], ["warning", "Caution"], ["blocked", "Blocked + label"], ["pending", "Pending"],
-] as const;
-const chart = ["Evergreen", "Clay", "Iris", "River", "Ochre", "Berry"];
-const outflow: ActionCard["daily_outflow"] = { date: "2026-11-15", used_cents: 125000, pending_cents: 0, remaining_cents: 375000, limit_cents: 500000, items: [] };
-const base: ActionCard = { action_id: "preview", type: "bill_payment", status: "proposed", title: "Pay your credit card", amount_cents: 491238, from_label: "Everyday Chequing", to_label: "Rewards Credit Card", balance_after_cents: null, checks: [], requires_second_confirmation: false, second_confirmed: false, max_passing_amount_cents: null, max_passing_quantity: null, primary_message: null, created_at: "2026-11-15T12:00:00Z", execute_at: null, executed_at: null, daily_outflow: outflow };
-const examples: { label: string; card: ActionCard }[] = [
-  { label: "01 / Proposed", card: { ...base, title: "Move to savings", type: "transfer", amount_cents: 200000, to_label: "High-Interest Savings", balance_after_cents: 84012 } },
-  { label: "02 / Second confirmation", card: { ...base, title: "Send an e-transfer", type: "etransfer", amount_cents: 20000, to_label: "New recipient", requires_second_confirmation: true } },
-  { label: "03 / Blocked", card: { ...base, status: "blocked", primary_message: "This would leave Everyday Chequing under $500.", max_passing_amount_cents: 234012 } },
-  { label: "04 / Pending undo", card: { ...base, status: "pending_undo", amount_cents: 125000, execute_at: "2026-11-15T12:01:00Z" } },
-  { label: "05 / Executed", card: { ...base, status: "executed", amount_cents: 125000, executed_at: "2026-11-15T12:01:00Z" } },
-  { label: "06 / Cancelled", card: { ...base, status: "cancelled", amount_cents: 125000 } },
-];
-const money = (cents: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(cents / 100);
-const states: Record<ActionStatus, string> = { proposed: "Ready to review", blocked: "Blocked", pending_undo: "Pending", executed: "Executed", cancelled: "Cancelled" };
-function ApprovalCard({ card }: { card: ActionCard }) {
-  const state = card.requires_second_confirmation && !card.second_confirmed ? "Confirmation needed" : states[card.status];
-  return <article className="rounded-coin border border-border bg-surface p-5 shadow-coin">
-    <div className="flex items-start justify-between gap-3"><div><p className={`text-xs font-bold uppercase tracking-wider ${card.status === "blocked" ? "text-blocked" : card.status === "pending_undo" ? "text-pending" : "text-muted"}`}>{card.status === "blocked" ? "? " : card.status === "executed" ? "? " : ""}{state}</p><h4 className="mt-2 text-lg font-bold">{card.title}</h4></div>{card.status === "pending_undo" && <div className="relative grid h-14 w-14 shrink-0 place-items-center" aria-label="60 seconds remaining"><svg className="absolute inset-0 -rotate-90" viewBox="0 0 56 56" aria-hidden="true"><circle cx="28" cy="28" r="24" fill="none" stroke="var(--border)" strokeWidth="3"/><circle cx="28" cy="28" r="24" fill="none" stroke="var(--pending)" strokeWidth="3" strokeDasharray="151" strokeDashoffset="0"/></svg><span className="money text-xs font-bold">60s</span></div>}</div>
-    <p className="money mt-4 text-2xl font-bold tracking-tight">{card.amount_cents !== null ? money(card.amount_cents) : "?"}</p><p className="mt-2 text-sm text-muted">{card.from_label} ? {card.to_label}</p>
-    {card.balance_after_cents !== null && <p className="money mt-2 text-sm text-muted">Balance after: {money(card.balance_after_cents)}</p>}
-    {card.requires_second_confirmation && <p className="mt-4 rounded-coin-sm bg-surface-soft p-3 text-sm">Confirm the recipient?s email before approving.</p>}
-    {card.primary_message && <p className="money mt-4 rounded-coin-sm bg-surface-soft p-3 text-sm text-blocked">{card.primary_message}</p>}
-    <div className="mt-5 flex flex-wrap gap-2">{card.status === "proposed" && <><button type="button" disabled className="rounded-full bg-accent px-4 py-2 text-sm font-bold text-accent-ink">{card.requires_second_confirmation ? "Confirm recipient" : "Approve"}</button><span className="rounded-full border border-border px-4 py-2 text-sm">Cancel</span></>}{card.status === "blocked" && card.max_passing_amount_cents !== null && <span className="money rounded-full border border-border px-4 py-2 text-sm font-bold">Use {money(card.max_passing_amount_cents)} instead</span>}{card.status === "pending_undo" && <><span className="rounded-full bg-accent px-4 py-2 text-sm font-bold text-accent-ink">Undo</span><span className="rounded-full border border-border px-4 py-2 text-sm">Execute now</span></>}</div>
-  </article>;
+function SectionIntro({ index, title, body }: { index: string; title: string; body?: string }) {
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-widest text-accent">{index}</p>
+      <h3 className="mt-3 text-2xl font-bold">{title}</h3>
+      {body && <p className="mt-3 text-sm leading-6 text-muted">{body}</p>}
+    </div>
+  );
 }
+
+function Section({ intro, children }: { intro: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="mt-16 grid gap-12 border-t border-border pt-12 lg:grid-cols-[200px_1fr]">
+      {intro}
+      {children}
+    </div>
+  );
+}
+
+function ColourSwatches() {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {colourRoles.map(([name, role]) => (
+        <div key={name} className="overflow-hidden rounded-coin-sm border border-border bg-surface">
+          <div className="h-16 border-b border-border" style={{ background: `var(--${name})` }} />
+          <div className="p-3">
+            <p className="text-sm font-bold">{name}</p>
+            <p className="mt-1 text-xs text-muted">{role}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TypeScale() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-xs text-muted">Display / 48</p>
+        <p className="money mt-1 text-4xl font-bold tracking-tight md:text-5xl">$128,450.12</p>
+      </div>
+      <div>
+        <p className="text-xs text-muted">Heading / 30</p>
+        <p className="mt-1 text-3xl font-bold">Your money, in view</p>
+      </div>
+      <div>
+        <p className="text-xs text-muted">Title / 20</p>
+        <p className="mt-1 text-xl font-bold">Everyday Chequing</p>
+      </div>
+      <div>
+        <p className="text-xs text-muted">Body / 16 &middot; Caption / 12</p>
+        <p className="mt-1 text-base">A clear next step, whenever you need one.</p>
+        <p className="money mt-1 text-xs text-muted">Available balance &middot; $2,840.12</p>
+      </div>
+    </div>
+  );
+}
+
+function Foundations() {
+  return (
+    <div className="grid gap-6 md:grid-cols-3">
+      <div className="rounded-coin border border-border bg-surface p-5">
+        <p className="font-bold">Spacing</p>
+        <div className="mt-4 flex items-end gap-2">
+          {[4, 8, 12, 16, 24, 32, 48].map((n) => (
+            <div key={n} className="text-center">
+              <div className="mx-auto bg-accent" style={{ width: n, height: n }} />
+              <span className="text-xs text-muted">{n}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-coin border border-border bg-surface p-5">
+        <p className="font-bold">Radius</p>
+        <div className="mt-4 flex gap-3">
+          {[8, 16, 24].map((n) => (
+            <div key={n} className="grid h-14 w-14 place-items-center border border-accent text-xs" style={{ borderRadius: n }}>
+              {n}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-coin border border-border bg-surface p-5 shadow-coin">
+        <p className="font-bold">Elevation</p>
+        <p className="mt-4 text-sm text-muted">A soft card shadow separates layers without adding noise.</p>
+      </div>
+    </div>
+  );
+}
+
+function ChartPalette() {
+  const max = Math.max(...chartSeries.map((s) => s.value));
+  return (
+    <div className="rounded-coin border border-border bg-surface p-6 shadow-coin">
+      <p className="font-bold">A categorical palette</p>
+      <div className="mt-6 grid grid-cols-6 items-end gap-4">
+        {chartSeries.map((series, i) => (
+          <div key={series.name} className="flex flex-col items-center gap-2">
+            <div
+              className="w-full max-w-14 rounded-md"
+              style={{ height: (series.value / max) * 110, background: `var(--chart-${i + 1})` }}
+            />
+            <p className="flex items-center gap-1.5 text-xs">
+              <span className="inline-block h-2 w-2 rounded-full" style={{ background: `var(--chart-${i + 1})` }} />
+              {series.name}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CoinAvatar({ size = "h-8 w-8 text-sm" }: { size?: string }) {
+  return (
+    <div className={`grid shrink-0 place-items-center rounded-full bg-accent font-bold text-accent-ink ${size}`} aria-label="Coin">
+      C
+    </div>
+  );
+}
+
+function ProductSamples() {
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <div className="rounded-coin border border-border bg-surface p-6 shadow-coin">
+        <p className="text-xs font-bold uppercase tracking-wider text-muted">Balance header</p>
+        <p className="mt-4 text-sm text-muted">Net worth</p>
+        <p className="money mt-1 text-4xl font-bold tracking-tight">$386,214.07</p>
+        <p className="money mt-2 text-sm text-gain">+$4,812.30 (1.3%) this month</p>
+
+        <p className="mt-8 text-xs font-bold uppercase tracking-wider text-muted">Account rows</p>
+        <div className="mt-2 divide-y divide-border">
+          <AccountRow name="Everyday Chequing" kind={"Chequing · 4471"} amount={284_012} />
+          <AccountRow name="TFSA" kind={"Investments · 1188"} amount={9_754_840} />
+          <AccountRow name="Rewards Credit Card" kind="Due in 9 days" amount={-491_238} />
+        </div>
+      </div>
+
+      <div className="rounded-coin border border-border bg-surface-soft p-6">
+        <p className="text-xs font-bold uppercase tracking-wider text-muted">Coin sidebar message</p>
+        <div className="mt-4 flex gap-3">
+          <CoinAvatar />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm leading-6">
+              Your investments are up 14.2% this year. Northwind Robotics is 33% of everything you hold, the one
+              position worth a closer look.
+            </p>
+            <div className="mt-3 rounded-coin border border-border bg-surface p-4">
+              <p className="text-sm font-bold">Allocation by holding</p>
+              <div className="mt-3 flex h-3 overflow-hidden rounded-full">
+                {[33, 26, 13, 11, 10, 7].map((w, i) => (
+                  <div key={i} style={{ width: `${w}%`, background: `var(--chart-${i + 1})` }} />
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted">Chart placeholder &middot; real charts come from W7</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AccountRow({ name, kind, amount }: { name: string; kind: string; amount: number }) {
+  return (
+    <div className="flex items-center justify-between py-4">
+      <div>
+        <p className="font-bold">{name}</p>
+        <p className="text-xs text-muted">{kind}</p>
+      </div>
+      <p className={`money font-bold ${amount < 0 ? "text-loss" : ""}`}>
+        {amount < 0 ? `−${money(-amount)}` : money(amount)}
+      </p>
+    </div>
+  );
+}
+
+function OutflowMeter() {
+  const share = (outflow.used_cents / outflow.limit_cents) * 100;
+  return (
+    <div className="max-w-md rounded-coin border border-border bg-surface p-5">
+      <div className="money flex justify-between gap-4 text-sm font-bold">
+        <span>Paid out today</span>
+        <span>
+          {money(outflow.used_cents)} of {money(outflow.limit_cents)}
+        </span>
+      </div>
+      <div
+        className="mt-3 h-2 overflow-hidden rounded-full bg-surface-soft"
+        role="meter"
+        aria-label="Paid out today"
+        aria-valuemin={0}
+        aria-valuemax={outflow.limit_cents / 100}
+        aria-valuenow={outflow.used_cents / 100}
+      >
+        <div className="h-full rounded-full bg-pending" style={{ width: `${share}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-muted">Includes pending and executed bill payments and e-transfers.</p>
+    </div>
+  );
+}
+
 function ThemeSheet({ theme }: { theme: "light" | "dark" }) {
-  return <section data-theme={theme} className="bg-background text-foreground"><div className="mx-auto max-w-7xl px-6 py-14 md:px-12 md:py-20">
-    <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-8"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-accent">Coin / Design system</p><h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">A little more clarity.</h2><p className="mt-3 max-w-xl text-muted">A quiet foundation for confident decisions. This is a static design review, not a working product.</p></div><span className="rounded-full border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider">{theme} mode</span></div>
-    <div className="mt-14 grid gap-12 lg:grid-cols-[200px_1fr]"><div><p className="text-xs font-bold uppercase tracking-widest text-accent">01 / Colour</p><h3 className="mt-3 text-2xl font-bold">Useful by nature.</h3><p className="mt-3 text-sm leading-6 text-muted">Soft surfaces, clear ink and a single grounded accent.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{roles.map(([name, role]) => <div key={name} className="overflow-hidden rounded-coin-sm border border-border bg-surface"><div className="h-16 border-b border-border" style={{ background: `var(--${name})` }}/><div className="p-3"><p className="text-sm font-bold">{name}</p><p className="mt-1 text-xs text-muted">{role}</p></div></div>)}</div></div>
-    <div className="mt-16 grid gap-12 border-t border-border pt-12 lg:grid-cols-[200px_1fr]"><div><p className="text-xs font-bold uppercase tracking-widest text-accent">02 / Type</p><h3 className="mt-3 text-2xl font-bold">Room to breathe.</h3><p className="mt-3 text-sm leading-6 text-muted">Manrope, with tabular figures for every money value.</p></div><div className="space-y-6"><div><p className="text-xs text-muted">Display / 48</p><p className="money mt-1 text-4xl font-bold tracking-tight md:text-5xl">$128,450.12</p></div><div><p className="text-xs text-muted">Heading / 30</p><p className="mt-1 text-3xl font-bold">Your money, in view</p></div><div><p className="text-xs text-muted">Title / 20</p><p className="mt-1 text-xl font-bold">Everyday Chequing</p></div><div><p className="text-xs text-muted">Body / 16 ? Caption / 12</p><p className="mt-1 text-base">A clear next step, whenever you need one.</p><p className="money mt-1 text-xs text-muted">Available balance ? $2,840.12</p></div></div></div>
-    <div className="mt-16 grid gap-12 border-t border-border pt-12 lg:grid-cols-[200px_1fr]"><div><p className="text-xs font-bold uppercase tracking-widest text-accent">03 / Foundations</p><h3 className="mt-3 text-2xl font-bold">Measured details.</h3></div><div className="grid gap-6 md:grid-cols-3"><div className="rounded-coin border border-border bg-surface p-5"><p className="font-bold">Spacing</p><div className="mt-4 flex items-end gap-2">{[4,8,12,16,24,32,48].map(n => <div key={n} className="text-center"><div className="mx-auto bg-accent" style={{width: n, height: n}}/><span className="text-xs text-muted">{n}</span></div>)}</div></div><div className="rounded-coin border border-border bg-surface p-5"><p className="font-bold">Radius</p><div className="mt-4 flex gap-3">{[8,16,24].map(n => <div key={n} className="grid h-14 w-14 place-items-center border border-accent text-xs" style={{borderRadius:n}}>{n}</div>)}</div></div><div className="rounded-coin border border-border bg-surface p-5 shadow-coin"><p className="font-bold">Elevation</p><p className="mt-4 text-sm text-muted">A soft card shadow separates layers without adding noise.</p></div></div></div>
-    <div className="mt-16 grid gap-12 border-t border-border pt-12 lg:grid-cols-[200px_1fr]"><div><p className="text-xs font-bold uppercase tracking-widest text-accent">04 / Data</p><h3 className="mt-3 text-2xl font-bold">Distinct, not loud.</h3><p className="mt-3 text-sm leading-6 text-muted">Categories carry labels as well as colour.</p></div><div className="rounded-coin border border-border bg-surface p-6 shadow-coin"><p className="font-bold">A categorical palette</p><svg viewBox="0 0 600 140" className="mt-5 h-36 w-full" role="img" aria-label="Six example categories shown as bars">{chart.map((name,i) => <rect key={name} x={i*100+12} y={130-[76,110,62,96,85,50][i]} width="56" height={[76,110,62,96,85,50][i]} rx="5" fill={`var(--chart-${i+1})`}/>)}</svg><div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">{chart.map((name,i)=><p key={name} className="text-xs"><span className="mr-2 inline-block h-2 w-2 rounded-full" style={{background:`var(--chart-${i+1})`}}/>{name}</p>)}</div></div></div>
-    <div className="mt-16 border-t border-border pt-12"><p className="text-xs font-bold uppercase tracking-widest text-accent">05 / Action language</p><div className="mt-3 flex flex-wrap items-end justify-between gap-4"><div><h3 className="text-3xl font-bold">A moment to decide.</h3><p className="mt-2 text-muted">Six static views of the approval card.</p></div><div className="grid h-14 w-14 place-items-center rounded-full bg-accent text-lg font-bold text-accent-ink" aria-label="Collapsed Coin">C</div></div><div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">{examples.map(({label,card})=><div key={label}><p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted">{label}</p><ApprovalCard card={card}/></div>)}</div><div className="mt-8 max-w-md rounded-coin border border-border bg-surface p-5"><div className="money flex justify-between gap-4 text-sm font-bold"><span>Paid out today</span><span>$1,250 of $5,000</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-soft" role="meter" aria-label="Paid out today" aria-valuemin={0} aria-valuemax={5000} aria-valuenow={1250}><div className="h-full w-1/4 rounded-full bg-accent"/></div><p className="mt-2 text-xs text-muted">Includes pending and executed payments.</p></div></div>
-  </div></section>;
+  return (
+    <section data-theme={theme} className="bg-background text-foreground">
+      <div className="mx-auto max-w-7xl px-6 py-14 md:px-12 md:py-20">
+        <header className="flex flex-wrap items-end justify-between gap-6 border-b border-border pb-8">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">Coin / Design system</p>
+            <h2 className="mt-3 text-4xl font-bold tracking-tight md:text-5xl">A little more clarity.</h2>
+            <p className="mt-3 max-w-xl text-muted">
+              A quiet foundation for confident decisions. This is a static design review, not a working product.
+            </p>
+          </div>
+          <span className="rounded-full border border-border px-4 py-2 text-xs font-bold uppercase tracking-wider">
+            {theme} mode
+          </span>
+        </header>
+
+        <Section intro={<SectionIntro index="01 / Colour" title="Useful by nature." body="Soft surfaces, clear ink and a single grounded accent." />}>
+          <ColourSwatches />
+        </Section>
+        <Section intro={<SectionIntro index="02 / Type" title="Room to breathe." body="Manrope, with tabular figures for every money value." />}>
+          <TypeScale />
+        </Section>
+        <Section intro={<SectionIntro index="03 / Foundations" title="Measured details." />}>
+          <Foundations />
+        </Section>
+        <Section intro={<SectionIntro index="04 / Data" title="Distinct, not loud." body="Categories carry labels as well as colour." />}>
+          <ChartPalette />
+        </Section>
+        <Section intro={<SectionIntro index="05 / Product" title="Numbers first." body="The dashboard and Coin share one calm voice." />}>
+          <ProductSamples />
+        </Section>
+
+        <div className="mt-16 border-t border-border pt-12">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <SectionIntro index="06 / Action language" title="A moment to decide." body="Every state of the approval card, with the rule checks." />
+            <CoinAvatar size="h-14 w-14 text-lg" />
+          </div>
+          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {exampleCards.map(({ label, card }) => (
+              <div key={label}>
+                <p className="mb-3 text-xs font-bold uppercase tracking-wider text-muted">{label}</p>
+                <ApprovalCardPreview card={card} />
+              </div>
+            ))}
+          </div>
+          <div className="mt-8">
+            <OutflowMeter />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
-export default function TokensPage() { return <main><ThemeSheet theme="light"/><ThemeSheet theme="dark"/></main>; }
+
+export default function TokensPage() {
+  return (
+    <main>
+      <ThemeSheet theme="light" />
+      <ThemeSheet theme="dark" />
+    </main>
+  );
+}
