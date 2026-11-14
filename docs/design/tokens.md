@@ -1,52 +1,67 @@
-# Coin / design tokens - approval sheet
+# Coin design tokens, v2 (for Pranav's approval)
 
-Coin feels like a quiet workspace for understanding money, with warm mineral surfaces and generous spacing. Grounded evergreen gives the assistant a recognizable presence while the numbers stay foremost. Clear labels, restrained elevation and deliberate pauses make consequential actions easy to review.
+v2 answers the v1 review: v1 was too restrained and flat. v2 is bolder (heavier
+type, a deliberate grey ladder for contrast, stronger accents), gives every
+approval-card state its own frame, and replaces the "C" with a real mascot.
 
-**Identity:** Unlike Wealthsimple's editorial, high-contrast monochrome and expressive typography, Coin uses a soft mineral palette and a single practical sans. Unlike Ramp's assertive, business-oriented presentation, Coin is a quieter personal workspace with an evergreen accent. Unlike Plaid's infrastructure-focused visual language, Coin centres a gentle assistant and readable financial summaries; its surfaces, palette and composition are its own. These are craft references, not assets or layouts to reproduce.
+Live preview: `/tokens` (light and dark, with replayable animations).
+
+## Direction
+
+Numbers lead. Money amounts and headings are Manrope 800; body copy is 500 with
+key figures in 800. One surface is allowed to be loud: the dark balance hero.
+Everything around it is white cards on a light grey page. Emerald means "do"
+and "gain". Gold belongs to Coin: the mascot, and its presence in the sidebar.
+
+How it differs from the references: no monochrome editorial look, no
+business-blue, no infrastructure gradients. The gold mascot and the
+emerald/gold pairing are Coin's own.
 
 ## Colour
 
-Values are light / dark. Surface colors form a role-based neutral scale; foregrounds must be used on their specified surfaces, not arbitrarily paired.
+Grey ladder (light theme; dark theme inverts the ladder):
 
-| Token | Light | Dark | Role |
+| Step | Light | Dark | Used for |
 | --- | --- | --- | --- |
-| background | #f7f6f2 | #141d1a | page canvas |
-| surface | #ffffff | #202c27 | cards |
-| surface-soft | #eeeee9 | #2b3933 | inset, meter track |
-| foreground | #172925 | #eef3ed | primary ink |
-| muted | #52615c | #bdcbc0 | supporting ink |
-| border | #cbd2cb | #52655a | separators and card outline |
-| accent | #315e50 | #a7d5bb | Coin and primary actions |
-| accent-ink | #ffffff | #142820 | text on accent |
-| gain | #286447 | #a4d6ad | positive movement, with sign/label |
-| loss | #a23e3a | #ffb5ab | negative movement, with sign/label |
-| warning | #805b12 | #e8ca80 | caution with label |
-| blocked | #a23e3a | #ffb5ab | failed action with icon and label |
-| pending | #665092 | #d5c2f4 | undo window and ring |
-| chart-1 / Evergreen | #315e50 | #a7d5bb | category 1 |
-| chart-2 / Clay | #865244 | #efb9a5 | category 2 |
-| chart-3 / Iris | #59538b | #cbc4ff | category 3 |
-| chart-4 / River | #376579 | #a4d3e3 | category 4 |
-| chart-5 / Ochre | #80631e | #e8ca80 | category 5 |
-| chart-6 / Berry | #8b4d69 | #efb8ce | category 6 |
+| 0 | #ffffff | #161e1a | cards |
+| 50 | #f5f6f4 | #1d2621 | insets |
+| 100 | #ebedea | #0d1311 | page |
+| 200 | #d7dbd6 | #2b3731 | borders |
+| 300 | #b9c0b9 | #3d4b44 | strong borders, secondary buttons |
+| 500 | #67716a | #8e9993 | supporting text |
+| 700 | #353e39 | #c6cec8 | secondary text |
+| 900 | #111814 | #f3f5f2 | primary text, the dark hero |
 
-**Contrast:** WCAG relative-luminance calculations against `surface`: foreground 15.21:1 / 12.87:1; muted 6.52 / 8.59; accent 7.37 / 8.88; gain 6.99 / 8.82; loss and blocked 6.39 / 8.58; warning 6.13 / 9.09; pending 6.71 / 8.86 (light / dark). Chart 1-6 against surface: 7.37, 6.36, 6.92, 6.36, 5.64, 6.24 / 8.88, 8.38, 8.88, 8.96, 9.09, 8.56. These exceed AA 4.5:1 for normal text and 3:1 for meaningful graphics on that surface. Chart categories also need labels or patterns; colour alone is not identification. Border is decorative, not a text colour.
+Accents (light / dark): accent #0a7c55 / #3fd69a; gold #e9a80f / #f5bd3a;
+pending #5b3fd4 / #a994ff; loss #c42f27 / #ff8a80; warning #9a5a00 / #f2b54c.
+Chart palette: emerald, gold, violet, blue #2b78c9, rose #d1426f, slate #55626b.
 
-## Type and rhythm
+Text pairs used: grey-900 on white and grey-100 (over 15:1), grey-700 on white
+(about 10:1), grey-500 on white (about 4.9:1, supporting text only), accent and
+loss on white (above 5:1), white on accent (about 5.3:1).
 
-Manrope (free Google font) is the one UI family; system sans is the fallback. Use `font-variant-numeric: tabular-nums` for every money value and aligned numeric data. Scale: display 48/1.1, heading 30/1.2, title 20/1.4, body 16/1.5, small 14/1.5, caption 12/1.4; weights 400, 600 and 700. Avoid all-caps except short section labels.
+## Type
 
-Spacing: 4, 8, 12, 16, 24, 32, 48 px. Radii: 8 px controls/insets, 16 px cards, 24 px large containers, full circle for pills and Coin. Elevation: one soft card shadow, `0 8px 28px rgba(23,41,37,.07)` light and `rgba(0,0,0,.25)` dark; borders retain structure. Motion: 120 ms for feedback, 220 ms for transitions, 360 ms for larger reveals, easing `cubic-bezier(.2,0,0,1)`; respect reduced motion. The undo ring represents the 60-second window, shrinking continuously while a textual seconds remaining label stays visible; reduced motion keeps the text without continuous animation. The preview ring is static.
+Manrope only. Amount 56/800, heading 30/800, title 18/800, body 16/500,
+supporting 14/600 in grey-700. Tabular figures for all money. Sentence case
+everywhere; no all-caps labels.
 
-## Component sketches
+## Shape and motion
 
-- **Account row:** name and account type on the left, tabular balance aligned right; a fine divider and generous 16 px padding.
-- **Balance header:** small contextual label above a large, tabular balance; secondary change includes both sign and descriptive text.
-- **Coin message:** a small Coin circle anchors a concise response on a soft surface, with enough line spacing for scanning.
-- **Chart card:** title, time context, labelled marks and legend on a surface card; never rely on colour alone.
-- **Approval card:** amount and from/to are always prominent. Proposed offers Approve and Cancel; a proposed action needing second confirmation asks for the recipient email before approval. Blocked shows a labelled warning and, when provided by the contract, a maximum passing amount as "Use $2,340.12 instead". Pending shows Undo, Execute now, and the 60-second ring; executed shows a check and status; cancelled shows its status. The preview is illustrative and controls do not execute actions.
-- **Check list:** each rule check uses a clear pass, flag or fail label and corresponding icon, with explanation for flags and failures; never colour alone.
-- **Collapsed Coin circle:** a small evergreen circle with a high-contrast C, a visible focus state and an accessible name in an interactive implementation.
-- **Daily outflow:** labelled meter states paid out today and the $5,000 limit; include pending and executed bill payments and e-transfers.
+Radius 10 / 18 / 28. One card shadow. Motion only answers an action:
+- Executed: green ring, the check badge pops in, the check draws itself, one
+  settle pulse around the card.
+- Cancelled: light red border and tint, the amount is struck through left to
+  right, "Nothing moved. Your balances are unchanged."
+- Pending: violet ring drains over the real 60 seconds with a live counter.
+- Blocked: red edge bar on the left.
+- Mascot: blinks when idle; the rim turns while Coin is reading data.
+All motion stops under prefers-reduced-motion.
 
-The preview at `/tokens` displays both themes side by side in sequence for review. This sheet is a proposal for Pranav's approval before screen implementation.
+## Mascot
+
+Four options on the preview page: Minted (coin face with a reeded rim),
+Stack (coin head on a stack), Flip (coin caught mid-flip), Sprout (coin with a
+sprout). Recommended: Minted. It reads at 16px, has clear moods (idle,
+thinking, happy, concerned), and its thinking state (the rim turning) is
+unmistakably a coin.
