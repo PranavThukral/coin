@@ -47,13 +47,26 @@ function Glint({ thinking, cx = 32, cy = 32, r = 21 }: { thinking: boolean; cx?:
   );
 }
 
-/** Ring: a minted disc with one crisp inner ring and a glint. */
+/** A restrained dollar sign: thin strokes in the deep gold, struck into the disc. */
+function DollarSign() {
+  return (
+    <g fill="none" stroke="var(--gold-deep)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M37.2 26.2 C36.3 24 34.4 23 32 23 C29 23 27 24.6 27 27 C27 32.6 37 30.4 37 36.2 C37 38.9 34.9 40.6 32 40.6 C29.3 40.6 27.3 39.5 26.6 37.3" />
+      <path d="M32 19.5 V23" />
+      <path d="M32 40.6 V44.5" />
+    </g>
+  );
+}
+
+/** Ring: a minted disc with one crisp inner ring, a glint and a dollar sign. */
 function Ring({ mood }: { mood: MascotMood }) {
+  const resting = mood === "idle" || mood === "thinking";
   return (
     <>
       <circle cx="32" cy="32" r="28" fill="var(--gold)" />
       <circle cx="32" cy="32" r="21.5" fill="none" stroke="var(--gold-deep)" strokeOpacity="0.45" strokeWidth="2" />
-      {mood === "idle" || mood === "thinking" ? <Glint thinking={mood === "thinking"} /> : null}
+      {resting && <Glint thinking={mood === "thinking"} />}
+      {resting && <DollarSign />}
       <MoodGlyph mood={mood} />
     </>
   );

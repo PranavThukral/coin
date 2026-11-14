@@ -57,7 +57,7 @@ function MascotOptions() {
       </div>
 
       <div className="mt-6 rounded-coin border border-border bg-surface p-6 shadow-coin">
-        <p className="text-lg font-extrabold">Recommended: Ring, in every mood</p>
+        <p className="text-lg font-extrabold">Coin&rsquo;s mark: Ring, in every mood</p>
         <div className="mt-5 grid grid-cols-2 gap-6 md:grid-cols-4">
           {MOODS.map(({ mood, when }) => (
             <div key={mood} className="flex flex-col items-center text-center">
