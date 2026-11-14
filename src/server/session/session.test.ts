@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { TEMPLATE_SESSION_ID, daysBetween, SEED_ANCHOR_DATE } from "../../contracts";
 import { approve, proposeAction } from "../actions/service";
 import { seededTestDb, type SeededTestDb } from "../db/test-db";
-import { createSession, hashIp, resolveSession } from "./session";
+import { createSession, hashIp, resolveSession, SESSION_LIMITS } from "./session";
 
 // 15:00 UTC = 10:00 in Toronto on Nov 20, 2026.
 const NOON = new Date("2026-11-20T15:00:00Z");
@@ -111,5 +111,44 @@ describe("hashIp", () => {
     expect(hashIp("1.2.3.4", "a")).toBe(hashIp("1.2.3.4", "a"));
     expect(hashIp("1.2.3.4", "a")).not.toBe(hashIp("1.2.3.4", "b"));
     expect(hashIp("1.2.3.4", "a")).not.toContain("1.2.3.4");
+  });
+});
+
+describe("hardening", () => {
+  it("a session swept between lookup and touch is replaced, not reused", async () => {
+    const id = await createSession(f.db, NOON, null);
+    // Simulate the sweep winning the race: the row is gone when we touch it.
+    await f.db.query("delete from sessions where id = $1", [id]);
+    const result = await resolveSession(f.db, id, minutes(1), null);
+    expect(result.isNew).toBe(true);
+    expect(result.sessionId).not.toBe(id);
+  });
+
+  it("touches never move last_seen_at backwards", async () => {
+    const id = await createSession(f.db, NOON, null);
+    await resolveSession(f.db, id, minutes(30), null);
+    await resolveSession(f.db, id, minutes(10), null); // an older request finishing late
+    expect(new Date((await sessionRow(id)).last_seen_at).getTime()).toBe(minutes(30).getTime());
+  });
+
+  it("each creation sweeps at most a small batch of expired sessions", async () => {
+    for (let i = 0; i < SESSION_LIMITS.sweepBatch + 5; i += 1) await createSession(f.db, NOON, null);
+    await createSession(f.db, minutes(121), null);
+    const [left] = await f.db.query<{ n: number }>(
+      "select count(*)::int as n from sessions where not is_template and last_seen_at < $1",
+      [minutes(1).toISOString()],
+    );
+    expect(left.n).toBe(5);
+  });
+
+  it("refuses new sessions past the global cap with a friendly 503", async () => {
+    // Fresh (not expired) sessions only, so the bounded sweep can't make room.
+    const filler = SESSION_LIMITS.maxActive;
+    await f.db.query(
+      `insert into sessions (id, today_date, date_offset_days, last_seen_at)
+       select gen_random_uuid(), '2026-11-20', 5, $2 from generate_series(1, $1)`,
+      [filler, NOON.toISOString()],
+    );
+    await expect(createSession(f.db, minutes(1), null)).rejects.toMatchObject({ code: "unavailable" });
   });
 });

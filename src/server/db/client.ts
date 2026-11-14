@@ -59,7 +59,8 @@ export function db(): Db {
     const url = process.env.DATABASE_URL;
     if (url) {
       shared = postgresDb(url);
-    } else if (process.env.NODE_ENV !== "production") {
+    } else if (process.env.NODE_ENV === "development") {
+      // Only `next dev` sets this; any other environment fails closed below.
       shared = lazyLocalDb();
     } else {
       throw new Error("DATABASE_URL is not set");

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountId as AccountIdSchema, type AccountView } from "../contracts";
 import type { AccountId } from "../contracts";
+import { api } from "../lib/api";
 import { liveTransport, type ChatTransport } from "../lib/chat";
 import { Mascot } from "./coin/mascot";
 import { CoinSidebar } from "./coin/sidebar";
@@ -88,7 +89,49 @@ function useDeepLinkedAccount(): [AccountId | null, (id: AccountId | null) => vo
   return [accountId, setAccountId];
 }
 
+/**
+ * One /api/session call before anything else, so the dashboard and Coin don't
+ * race to create two different sessions on a first visit.
+ */
+function useSessionReady(): { ready: boolean; failed: string | null } {
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .session()
+      .then(() => !cancelled && setReady(true))
+      .catch((error: Error) => !cancelled && setFailed(error.message));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return { ready, failed };
+}
+
 export function AppShell({ transport, mode }: { transport: ChatTransport; mode: "live" | "demo" }) {
+  const session = useSessionReady();
+  if (session.failed) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-background p-6 text-center text-foreground">
+        <div>
+          <Mascot size={56} mood="concerned" />
+          <p className="mt-4 text-lg font-extrabold">{session.failed}</p>
+        </div>
+      </div>
+    );
+  }
+  if (!session.ready) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-background" aria-label="Opening your accounts">
+        <Mascot size={56} mood="thinking" />
+      </div>
+    );
+  }
+  return <ReadyShell transport={transport} mode={mode} />;
+}
+
+function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live" | "demo" }) {
   const [viewing, setViewing] = useDeepLinkedAccount();
   const [refreshKey, setRefreshKey] = useState(0);
   const [collapsed, setCollapsed] = useState(false);

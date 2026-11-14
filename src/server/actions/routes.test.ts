@@ -54,12 +54,32 @@ const move2000 = {
 };
 
 describe("session cookie", () => {
-  it("is set once, HttpOnly, and reused afterwards", async () => {
+  it("keeps the same session and refreshes the cookie on every response", async () => {
     expect(cookie).toMatch(/^coin_sid=[0-9a-f-]{36}$/);
     const again = await sessionGet(new Request("http://coin.test/api/session", { headers: { cookie } }));
-    expect(again.headers.get("set-cookie")).toBeNull();
+    expect((again.headers.get("set-cookie") ?? "").split(";")[0]).toBe(cookie);
     const body = await again.json();
     expect(body.daily_outflow.limit_cents).toBe(500_000);
+  });
+
+  it("is Secure over HTTPS (directly or behind a proxy) and not over plain HTTP", async () => {
+    const direct = await sessionGet(new Request("https://coin.test/api/session", { headers: { cookie } }));
+    expect(direct.headers.get("set-cookie")).toContain("Secure");
+    const proxied = await sessionGet(
+      new Request("http://coin.test/api/session", { headers: { cookie, "x-forwarded-proto": "https" } }),
+    );
+    expect(proxied.headers.get("set-cookie")).toContain("Secure");
+    const plain = await sessionGet(new Request("http://coin.test/api/session", { headers: { cookie } }));
+    expect(plain.headers.get("set-cookie")).not.toContain("Secure");
+  });
+
+  it("caps new sessions per visitor IP (429, friendly message)", async () => {
+    let last: Response | null = null;
+    for (let i = 0; i < 21; i += 1) {
+      last = await sessionGet(new Request("http://coin.test/api/session", { headers: { "x-forwarded-for": "9.9.9.9" } }));
+    }
+    expect(last?.status).toBe(429);
+    expect((await last!.json()).error).toMatch(/Try again/);
   });
 
   it("sets HttpOnly and SameSite=Lax", async () => {

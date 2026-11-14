@@ -18,6 +18,7 @@ import {
 } from "../../contracts";
 import { settleDueActions } from "../actions/service";
 import type { Db } from "../db/types";
+import { AppError } from "../errors";
 
 export interface ResolvedSession {
   sessionId: string;
@@ -29,18 +30,48 @@ type FoundSession = SessionRow & { id: string };
 
 const IDLE_MS = SESSION.idle_minutes * 60 * 1000;
 
+/** Each new session clones ~2,300 rows, so creation is capped. */
+export const SESSION_LIMITS = {
+  newPerIpPerHour: 20,
+  maxActive: 2_000,
+  sweepBatch: 25,
+} as const;
+
 export function hashIp(ip: string, salt: string): string {
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
 }
 
-/** Remove sessions idle past the window; their rows cascade away. */
+/** Remove a bounded batch of idle sessions (rows cascade), oldest first. */
 async function sweepExpired(db: Db, now: Date): Promise<void> {
   const cutoff = new Date(now.getTime() - IDLE_MS).toISOString();
-  await db.query("delete from sessions where not is_template and last_seen_at < $1", [cutoff]);
+  await db.query(
+    `delete from sessions where id in (
+       select id from sessions where not is_template and last_seen_at < $1
+       order by last_seen_at limit $2)`,
+    [cutoff, SESSION_LIMITS.sweepBatch],
+  );
+}
+
+async function enforceCreationLimits(db: Db, now: Date, ipHash: string | null): Promise<void> {
+  if (ipHash) {
+    const since = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+    const [recent] = await db.query<{ n: number }>(
+      "select count(*)::int as n from sessions where ip_hash = $1 and created_at > $2",
+      [ipHash, since],
+    );
+    if (recent.n >= SESSION_LIMITS.newPerIpPerHour) {
+      throw new AppError("rate_limited", "Too many new visits from here. Try again in an hour.");
+    }
+  }
+  const [active] = await db.query<{ n: number }>("select count(*)::int as n from sessions where not is_template");
+  if (active.n >= SESSION_LIMITS.maxActive) {
+    throw new AppError("unavailable", "Coin is busy right now. Try again in a few minutes.");
+  }
 }
 
 export async function createSession(db: Db, now: Date, ipHash: string | null): Promise<string> {
   await sweepExpired(db, now);
+  await enforceCreationLimits(db, now, ipHash);
   const id = randomUUID();
   const today = torontoToday(now);
   await db.transaction(async (tx) => {
@@ -84,9 +115,15 @@ export async function resolveSession(
   const existing = await findSession(db, cookieValue);
 
   if (existing && isUsable(existing, now)) {
-    await db.query("update sessions set last_seen_at = $2 where id = $1", [existing.id, now.toISOString()]);
-    await settleDueActions(db, existing.id, now);
-    return { sessionId: existing.id, isNew: false };
+    // Monotonic touch; zero rows means a sweep removed it a moment ago.
+    const touched = await db.query(
+      "update sessions set last_seen_at = greatest(last_seen_at, $2) where id = $1 returning id",
+      [existing.id, now.toISOString()],
+    );
+    if (touched.length === 1) {
+      await settleDueActions(db, existing.id, now);
+      return { sessionId: existing.id, isNew: false };
+    }
   }
 
   if (existing) {
