@@ -90,7 +90,7 @@ create table bills (
   session_id    uuid not null references sessions(id) on delete cascade,
   id            text not null,
   payee         text not null,               -- UNTRUSTED
-  amount_cents  bigint not null check (amount_cents > 0),
+  amount_cents  bigint not null check (amount_cents >= 0),  -- 0 = nothing due (e.g. card statement paid)
   due_date      date not null,
   recurrence    text not null check (recurrence in ('monthly','quarterly','annual','once')),
   category      text not null,
