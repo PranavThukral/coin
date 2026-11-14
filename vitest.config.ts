@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts", "eval/**/*.test.ts"],
     testTimeout: 20000,
   },
 });
