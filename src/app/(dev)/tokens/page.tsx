@@ -1,16 +1,17 @@
-// Design review page (dev only), v2. Renders Coin's identity in light and
-// dark so Pranav can approve it before any product screen is built.
+// Design review page (dev only), v3. Renders Coin's identity in light and
+// dark: the palette, type, the net worth hero, charts and every card state.
 import { ApprovalCardPreview } from "../../../components/actions/approval-card";
 import { Replay } from "../../../components/ui/live-bits";
 import { MASCOT_OPTIONS, Mascot, type MascotMood } from "../../../components/coin/mascot";
+import { areaPath, plot, smoothPath, type Scale } from "../../../lib/chart-path";
 import { chartSeries, exampleCards, money, outflow } from "./preview-data";
 
 const GREYS = ["grey-0", "grey-50", "grey-100", "grey-200", "grey-300", "grey-500", "grey-700", "grey-900"];
 
 const ACCENTS = [
-  { name: "accent", role: "Actions, gains" },
+  { name: "accent", role: "Actions, the lead chart line, the undo window" },
   { name: "gold", role: "Coin itself" },
-  { name: "pending", role: "Undo window" },
+  { name: "gain", role: "Gains on numbers, done" },
   { name: "loss", role: "Losses, blocks" },
   { name: "warning", role: "Needs a look" },
 ];
@@ -40,7 +41,7 @@ function MascotOptions() {
     <>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {MASCOT_OPTIONS.map((option) => (
-          <div key={option.variant} className="rounded-coin border border-border bg-surface p-6 shadow-coin">
+          <div key={option.variant} className="rounded-coin bg-surface p-6 shadow-coin">
             <div className="flex h-28 items-center justify-center rounded-coin-sm bg-surface-soft">
               <Mascot variant={option.variant} size={88} />
             </div>
@@ -56,7 +57,7 @@ function MascotOptions() {
         ))}
       </div>
 
-      <div className="mt-6 rounded-coin border border-border bg-surface p-6 shadow-coin">
+      <div className="mt-6 rounded-coin bg-surface p-6 shadow-coin">
         <p className="text-lg font-extrabold">Coin&rsquo;s mark: Ring, in every mood</p>
         <div className="mt-5 grid grid-cols-2 gap-6 md:grid-cols-4">
           {MOODS.map(({ mood, when }) => (
@@ -75,7 +76,7 @@ function MascotOptions() {
 function Colours() {
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-[3fr_2fr]">
-      <div className="rounded-coin border border-border bg-surface p-6 shadow-coin">
+      <div className="rounded-coin bg-surface p-6 shadow-coin">
         <p className="font-extrabold">Grey ladder</p>
         <p className="text-sm font-medium text-muted">Surfaces step up, text steps down. Every pair is chosen for contrast.</p>
         <div className="mt-4 grid grid-cols-8 overflow-hidden rounded-coin-sm border border-border">
@@ -89,7 +90,7 @@ function Colours() {
           ))}
         </div>
       </div>
-      <div className="rounded-coin border border-border bg-surface p-6 shadow-coin">
+      <div className="rounded-coin bg-surface p-6 shadow-coin">
         <p className="font-extrabold">Accents</p>
         <div className="mt-4 space-y-3">
           {ACCENTS.map(({ name, role }) => (
@@ -107,7 +108,7 @@ function Colours() {
 
 function TypeScale() {
   return (
-    <div className="mt-8 grid gap-6 rounded-coin border border-border bg-surface p-8 shadow-coin md:grid-cols-2">
+    <div className="mt-8 grid gap-6 rounded-coin bg-surface p-8 shadow-coin md:grid-cols-2">
       <div>
         <p className="text-sm font-bold text-subtle">Amount, 56 / 800</p>
         <p className="money text-[56px] font-extrabold leading-none tracking-tight">$386,214.07</p>
@@ -135,31 +136,37 @@ function TypeScale() {
   );
 }
 
-function BalanceHero() {
-  return (
-    <div className="relative overflow-hidden rounded-coin-lg bg-surface-ink p-8 text-on-ink shadow-coin">
-      <p className="text-sm font-bold text-on-ink-muted">Net worth</p>
-      <p className="money mt-1 text-5xl font-extrabold tracking-tight">$386,214.07</p>
-      <p className="money mt-3 inline-flex items-center gap-2 rounded-full bg-accent px-3 py-1 text-sm font-extrabold text-accent-ink">
-        +$4,812.30 this month
-      </p>
-      <div className="mt-8 grid grid-cols-3 gap-4 border-t border-white/15 pt-5">
-        <HeroStat label="Cash" value={2_734_012} />
-        <HeroStat label="Investments" value={36_378_633} />
-        <HeroStat label="Card owing" value={-491_238} />
-      </div>
-      <div className="absolute right-6 top-6">
-        <Mascot size={64} />
-      </div>
-    </div>
-  );
-}
+const HERO_VALUES = [286, 291, 296, 305, 310, 315, 313, 302, 320, 333, 342, 347, 349];
+const HERO_SCALE: Scale = { min: 280, max: 354, left: 4, right: 556, top: 8, bottom: 132 };
 
-function HeroStat({ label, value }: { label: string; value: number }) {
+function NetWorthHero() {
+  const points = plot(HERO_VALUES, HERO_SCALE);
   return (
-    <div>
-      <p className="text-xs font-bold text-on-ink-muted">{label}</p>
-      <p className="money mt-1 text-lg font-extrabold">{value < 0 ? `\u2212${money(-value)}` : money(value)}</p>
+    <div className="rounded-coin-lg bg-surface p-8 shadow-coin-float">
+      <p className="text-sm font-bold text-subtle">Net worth</p>
+      <p className="money mt-1 text-6xl font-extrabold leading-none tracking-[-0.035em]">
+        $349,400<span className="text-[0.5em] font-bold text-subtle">.39</span>
+      </p>
+      <p className="money mt-3 text-base font-extrabold text-gain">
+        +$63,079.92 (22.03%) <span className="font-semibold text-subtle">Past year</span>
+      </p>
+      <svg viewBox="0 0 560 140" className="mt-4 block w-full overflow-visible" aria-hidden="true">
+        <defs>
+          <linearGradient id={`hero-fill-${HERO_VALUES.length}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--accent)" stopOpacity="0.2" />
+            <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath(points, 140)} fill={`url(#hero-fill-${HERO_VALUES.length})`} />
+        <path d={smoothPath(points)} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+      <div className="mt-3 flex gap-1 text-sm font-extrabold text-subtle">
+        {["1M", "3M", "6M", "1Y", "All"].map((range) => (
+          <span key={range} className={`rounded-full px-3.5 py-1.5 ${range === "1Y" ? "bg-accent-soft text-accent-text" : ""}`}>
+            {range}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -180,16 +187,16 @@ function AccountRow({ name, kind, amount }: { name: string; kind: string; amount
 
 function CoinSidebar() {
   return (
-    <div className="rounded-coin-lg border border-border bg-surface shadow-coin">
+    <div className="rounded-coin-lg bg-surface shadow-coin-float">
       <div className="flex items-center gap-3 border-b border-border p-4">
         <Mascot size={36} mood="thinking" />
         <div>
           <p className="font-extrabold leading-tight">Coin</p>
-          <p className="text-xs font-bold text-pending">Reading your investments&hellip;</p>
+          <p className="text-xs font-bold text-accent-text">Reading your investments&hellip;</p>
         </div>
       </div>
       <div className="space-y-4 p-4">
-        <p className="ml-auto w-fit max-w-[80%] rounded-coin bg-surface-ink px-4 py-2.5 text-sm font-semibold text-on-ink">
+        <p className="ml-auto w-fit max-w-[80%] rounded-[22px] rounded-br-md bg-surface-ink px-4 py-2.5 text-sm font-semibold text-on-ink">
           How have my investments done, and what am I concentrated in?
         </p>
         <div className="flex gap-3">
@@ -218,7 +225,7 @@ function CoinSidebar() {
 function CollapsedCoin() {
   return (
     <div className="flex items-center gap-4">
-      <div className="grid h-16 w-16 place-items-center rounded-full bg-surface-ink shadow-coin ring-4 ring-gold/30">
+      <div className="grid h-16 w-16 place-items-center rounded-full bg-surface shadow-coin-float">
         <Mascot size={44} />
       </div>
       <div>
@@ -233,8 +240,8 @@ function ProductSamples() {
   return (
     <div className="mt-8 grid gap-6 lg:grid-cols-2">
       <div className="space-y-6">
-        <BalanceHero />
-        <div className="rounded-coin border border-border bg-surface px-6 shadow-coin">
+        <NetWorthHero />
+        <div className="rounded-coin bg-surface px-6 shadow-coin">
           <div className="divide-y divide-border">
             <AccountRow name="Everyday Chequing" kind="Chequing, ends 4471" amount={284_012} />
             <AccountRow name="TFSA" kind="Investments, ends 1188" amount={9_754_840} />
@@ -254,7 +261,7 @@ function ChartPalette() {
   const max = Math.max(...chartSeries.map((s) => s.value));
   const names = ["Housing", "Groceries", "Dining", "Shopping", "Transport", "Other"];
   return (
-    <div className="mt-8 rounded-coin border border-border bg-surface p-6 shadow-coin">
+    <div className="mt-8 rounded-coin bg-surface p-6 shadow-coin">
       <p className="font-extrabold">Spending by category</p>
       <div className="mt-6 grid grid-cols-6 items-end gap-4">
         {chartSeries.map((series, i) => (
@@ -274,7 +281,7 @@ function ChartPalette() {
 function OutflowMeter() {
   const share = (outflow.used_cents / outflow.limit_cents) * 100;
   return (
-    <div className="max-w-md rounded-coin border border-border bg-surface p-5 shadow-coin">
+    <div className="max-w-md rounded-coin bg-surface p-5 shadow-coin">
       <div className="money flex justify-between gap-4 text-sm font-extrabold">
         <span>Paid out today</span>
         <span>
@@ -289,7 +296,7 @@ function OutflowMeter() {
         aria-valuemax={outflow.limit_cents / 100}
         aria-valuenow={outflow.used_cents / 100}
       >
-        <div className="h-full rounded-full bg-pending" style={{ width: `${share}%` }} />
+        <div className="h-full rounded-full bg-accent" style={{ width: `${share}%` }} />
       </div>
       <p className="mt-2 text-xs font-semibold text-muted">Bill payments and e-transfers, pending and done.</p>
     </div>
@@ -320,14 +327,14 @@ function ActionCards() {
 
 function ThemeSheet({ theme }: { theme: "light" | "dark" }) {
   return (
-    <section data-theme={theme} className="bg-background text-foreground">
+    <section data-theme={theme} className="coin-canvas text-foreground">
       <div className="mx-auto max-w-7xl px-6 py-14 md:px-12 md:py-20">
         <header className="flex flex-wrap items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <Mascot size={72} />
             <div>
               <h2 className="text-5xl font-extrabold tracking-tight">Coin</h2>
-              <p className="mt-1 text-lg font-semibold text-muted">Design system v2, {theme} theme</p>
+              <p className="mt-1 text-lg font-semibold text-muted">Design system v3, {theme} theme</p>
             </div>
           </div>
         </header>
@@ -337,7 +344,7 @@ function ThemeSheet({ theme }: { theme: "light" | "dark" }) {
           <MascotOptions />
         </Section>
         <Section>
-          <Heading title="Colour" body="A deliberate grey ladder for contrast, emerald for doing, gold for Coin." />
+          <Heading title="Colour" body="A cool grey ladder for contrast, one ultramarine accent for doing, gold for Coin. Green and red only mark gains and losses." />
           <Colours />
         </Section>
         <Section>
@@ -345,14 +352,14 @@ function ThemeSheet({ theme }: { theme: "light" | "dark" }) {
           <TypeScale />
         </Section>
         <Section>
-          <Heading title="Product" body="One bold dark surface (the balance) and calm cards around it." />
+          <Heading title="Product" body="One hero figure over one chart, and calm white cards floating on the canvas around it." />
           <ProductSamples />
           <ChartPalette />
         </Section>
         <Section>
           <Heading
             title="Approval cards"
-            body="Every state has its own frame. Cards list only the checks that broke."
+            body="A trail across the top fills in as the action moves: checked, approved, done. Cards list only the checks that broke."
           />
           <ActionCards />
         </Section>

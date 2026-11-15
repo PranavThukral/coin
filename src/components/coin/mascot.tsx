@@ -72,7 +72,7 @@ function Ring({ mood }: { mood: MascotMood }) {
   );
 }
 
-/** Orbit: the disc with a small emerald companion; Coin as an agent at work. */
+/** Orbit: the disc with a small accent-coloured companion; Coin as an agent at work. */
 function Orbit({ mood }: { mood: MascotMood }) {
   const dotColour = mood === "concerned" ? "var(--loss)" : "var(--accent)";
   return (
@@ -105,7 +105,7 @@ function Facet({ mood }: { mood: MascotMood }) {
   );
 }
 
-/** Pair: gold in front of emerald. Coin (gold) and what it does for you (emerald). */
+/** Pair: gold in front of the accent. Coin (gold) and what it does for you (the accent). */
 function Pair({ mood }: { mood: MascotMood }) {
   return (
     <>
@@ -164,7 +164,7 @@ export const MASCOT_OPTIONS: { variant: MascotVariant; name: string; idea: strin
   {
     variant: "orbit",
     name: "Orbit",
-    idea: "The disc with an emerald companion that circles while Coin works. Most 'agent'.",
+    idea: "The disc with an accent-coloured companion that circles while Coin works. Most 'agent'.",
   },
   {
     variant: "facet",
@@ -174,6 +174,6 @@ export const MASCOT_OPTIONS: { variant: MascotVariant; name: string; idea: strin
   {
     variant: "pair",
     name: "Pair",
-    idea: "Gold over emerald: Coin and what it does for you. Ties the two accents together.",
+    idea: "Gold over the accent: Coin and what it does for you. Ties the two accents together.",
   },
 ];

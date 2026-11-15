@@ -111,7 +111,7 @@ function Progress({ index, running }: { index: number; running: boolean }) {
 
 const BUTTON = "rounded-full px-4 py-2 text-sm font-extrabold transition-transform active:scale-[0.97] disabled:opacity-40";
 const PRIMARY = `${BUTTON} bg-accent text-accent-ink shadow-coin-accent`;
-const SECONDARY = `${BUTTON} bg-surface-soft text-foreground`;
+const SECONDARY = `${BUTTON} bg-border/70 text-foreground hover:bg-border`;
 
 export function DemoPlayer(props: Props) {
   const { index, running, autoplay, setAutoplay, next } = usePlayback(props);

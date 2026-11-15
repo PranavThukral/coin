@@ -24,12 +24,18 @@ import {
 } from "recharts";
 import type { ChartPayload } from "../../contracts";
 import { compactMoney, money, shortDate, signedMoney } from "../../lib/format";
+import { useReducedMotion } from "../ui/motion";
 
 const SERIES_COLOURS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5", "--chart-6"];
 const colour = (index: number) => `var(${SERIES_COLOURS[Math.min(index, SERIES_COLOURS.length - 1)]})`;
 
 const AXIS_TICK = { fill: "var(--subtle)", fontSize: 11, fontWeight: 700 };
-const REVEAL = { isAnimationActive: true, animationDuration: 1100, animationEasing: "ease-out" as const };
+
+/** How every mark animates in. Still when the visitor asked for less motion. */
+function useReveal() {
+  const still = useReducedMotion();
+  return { isAnimationActive: !still, animationDuration: 1100, animationEasing: "ease-out" as const };
+}
 
 function humanize(value: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return shortDate(value);
@@ -147,6 +153,7 @@ function slicesOf(chart: ChartPayload): Slice[] {
 }
 
 function DonutChart({ chart }: { chart: ChartPayload }) {
+  const reveal = useReveal();
   const slices = slicesOf(chart);
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
   const highlight = chart.highlight ? humanize(chart.highlight.x) : null;
@@ -165,7 +172,7 @@ function DonutChart({ chart }: { chart: ChartPayload }) {
             stroke="none"
             startAngle={90}
             endAngle={-270}
-            {...REVEAL}
+            {...reveal}
           >
             {slices.map((slice) => (
               <Cell key={slice.name} fill={slice.fill} />
@@ -220,11 +227,12 @@ function barColour(chart: ChartPayload, index: number): string {
 
 /** Bars over time: upright columns. */
 function ColumnBars({ chart }: { chart: ChartPayload }) {
+  const reveal = useReveal();
   return (
     <BarChart data={chart.data} margin={MARGIN} barGap={3} barCategoryGap="26%">
       <Axes chart={chart} zeroBased />
       {seriesOf(chart).map((s, i) => (
-        <Bar key={s.key} dataKey={s.key} name={s.label} fill={barColour(chart, i)} radius={[5, 5, 0, 0]} maxBarSize={32} {...REVEAL} animationBegin={i * 160} />
+        <Bar key={s.key} dataKey={s.key} name={s.label} fill={barColour(chart, i)} radius={[5, 5, 0, 0]} maxBarSize={32} {...reveal} animationBegin={i * 160} />
       ))}
     </BarChart>
   );
@@ -239,6 +247,7 @@ function rowBarsHeight(chart: ChartPayload): number {
 
 /** Bars by category: one row each, so every name has room to be read. */
 function RowBars({ chart }: { chart: ChartPayload }) {
+  const reveal = useReveal();
   const series = seriesOf(chart);
   const xKey = chart.x.key;
   const highlightX = chart.highlight?.x;
@@ -249,7 +258,7 @@ function RowBars({ chart }: { chart: ChartPayload }) {
       <YAxis type="category" dataKey={xKey} tick={AXIS_TICK} tickLine={false} axisLine={false} width={96} tickFormatter={(v) => humanize(String(v))} />
       <Tooltip content={<ChartTooltip chart={chart} />} cursor={{ fill: "var(--surface-soft)" }} />
       {series.map((s, i) => (
-        <Bar key={s.key} dataKey={s.key} name={s.label} fill={barColour(chart, i)} radius={[0, 5, 5, 0]} maxBarSize={14} {...REVEAL} animationBegin={i * 160}>
+        <Bar key={s.key} dataKey={s.key} name={s.label} fill={barColour(chart, i)} radius={[0, 5, 5, 0]} maxBarSize={14} {...reveal} animationBegin={i * 160}>
           {single &&
             chart.data.map((row) => {
               const dimmed = highlightX && String(row[xKey]) !== highlightX;
@@ -269,6 +278,7 @@ const isRowBars = (chart: ChartPayload) => isBars(chart) && chart.x.type === "ca
 
 /** One series over time: a line with a soft fill under it. */
 function TrendArea({ chart, zeroBased }: { chart: ChartPayload; zeroBased: boolean }) {
+  const reveal = useReveal();
   const id = useId();
   const series = seriesOf(chart);
   return (
@@ -293,7 +303,7 @@ function TrendArea({ chart, zeroBased }: { chart: ChartPayload; zeroBased: boole
           fill={`url(#${id}-${i})`}
           dot={false}
           activeDot={ACTIVE_DOT}
-          {...REVEAL}
+          {...reveal}
         />
       ))}
     </AreaChart>
@@ -301,6 +311,7 @@ function TrendArea({ chart, zeroBased }: { chart: ChartPayload; zeroBased: boole
 }
 
 function Lines({ chart }: { chart: ChartPayload }) {
+  const reveal = useReveal();
   return (
     <LineChart data={chart.data} margin={MARGIN}>
       <Axes chart={chart} zeroBased={false} />
@@ -314,7 +325,7 @@ function Lines({ chart }: { chart: ChartPayload }) {
           strokeWidth={2.5}
           dot={false}
           activeDot={ACTIVE_DOT}
-          {...REVEAL}
+          {...reveal}
         />
       ))}
     </LineChart>

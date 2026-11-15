@@ -2,13 +2,26 @@
 
 // Numbers that move. When a balance changes (an action executed, a range was
 // picked) the figure counts to its new value instead of jumping.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { signedMoney } from "../../lib/format";
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
 function reducedMotion(): boolean {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return window.matchMedia(REDUCED_MOTION).matches;
+}
+
+function watchReducedMotion(onChange: () => void): () => void {
+  const query = window.matchMedia(REDUCED_MOTION);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/** True when the visitor asked their device for less motion. */
+export function useReducedMotion(): boolean {
+  return useSyncExternalStore(watchReducedMotion, reducedMotion, () => false);
 }
 
 /**

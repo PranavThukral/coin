@@ -54,7 +54,7 @@ interface Look {
 }
 
 const LOOK: Record<CardState, Look> = {
-  proposed: { chip: "bg-surface-soft text-muted", icon: <CheckIcon />, text: "Checked. Ready for you", steps: 1, bar: "bg-accent" },
+  proposed: { chip: "bg-border/70 text-muted", icon: <CheckIcon />, text: "Checked. Ready for you", steps: 1, bar: "bg-accent" },
   confirm: { chip: "bg-warning-soft text-warning", icon: <AlertIcon />, text: "New recipient: confirm first", steps: 1, bar: "bg-warning" },
   blocked: { chip: "bg-loss-soft text-blocked", icon: <CrossIcon />, text: "Blocked by a check", steps: 1, bar: "bg-blocked" },
   pending_undo: { chip: "bg-pending-soft text-pending", icon: <ClockIcon />, text: "Approved. You can still undo", steps: 2, bar: "bg-pending" },
@@ -70,7 +70,7 @@ function Trail({ state }: { state: CardState }) {
   return (
     <ol className="flex gap-1.5" aria-label={`Step ${look.steps} of ${TRAIL.length}: ${look.text}`}>
       {TRAIL.map((name, index) => (
-        <li key={name} className="h-1 flex-1 overflow-hidden rounded-full bg-surface-soft">
+        <li key={name} className="h-1 flex-1 overflow-hidden rounded-full bg-border">
           {index < look.steps && (
             <span className={`coin-fill block h-full rounded-full transition-colors duration-500 ${look.bar}`} style={{ "--i": index } as React.CSSProperties} />
           )}
@@ -191,7 +191,7 @@ function RecipientConfirmation({ name, onEmail }: { name: string; onEmail: (emai
 
 const BUTTON = "rounded-full px-5 py-2.5 text-sm font-extrabold transition-transform active:scale-[0.97] disabled:opacity-50";
 const PRIMARY = `${BUTTON} bg-accent text-accent-ink shadow-coin-accent hover:bg-accent-strong`;
-const SECONDARY = `${BUTTON} bg-surface-soft text-foreground hover:bg-border`;
+const SECONDARY = `${BUTTON} bg-border/70 text-foreground hover:bg-border`;
 
 function Actions(props: { card: ActionCard; state: CardState; email: string; busy: boolean } & CardHandlers) {
   const { card, state, email, busy } = props;
@@ -234,7 +234,7 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
 }
 
 function Amount({ card, state }: { card: ActionCard; state: CardState }) {
-  const value = card.amount_cents !== null ? money(card.amount_cents) : "—";
+  const value = card.amount_cents !== null ? money(card.amount_cents) : "\u2014";
   const size = "money mt-4 text-4xl font-extrabold leading-none tracking-[-0.03em]";
   if (state === "cancelled") {
     return <p className={`${size} inline-block text-subtle coin-struck`}>{value}</p>;

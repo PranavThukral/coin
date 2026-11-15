@@ -69,7 +69,7 @@ function StepTrail({ steps, working }: { steps: string[]; working: boolean }) {
             >
               {active ? <span className="coin-dot h-1.5 w-1.5 rounded-full bg-accent" /> : <CheckIcon className="h-2.5 w-2.5" />}
             </span>
-            <span className={active ? "text-accent-text" : ""}>{step.replace(/(…|\.\.\.)$/, "")}</span>
+            <span className={active ? "text-accent-text" : ""}>{step.replace(/(\u2026|\.\.\.)$/, "")}</span>
           </li>
         );
       })}
