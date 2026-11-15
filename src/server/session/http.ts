@@ -88,7 +88,10 @@ export async function withSession(
 
   try {
     const db = database();
-    const ipHash = hashIp(ip, process.env.IP_HASH_SALT ?? "");
+    // Local development has one IP for every browser and screenshot, so the
+    // per-IP cap on new sessions only applies to a deployed Coin.
+    const local = process.env.NODE_ENV === "development";
+    const ipHash = local ? null : hashIp(ip, process.env.IP_HASH_SALT ?? "");
     const session = await resolveSession(db, cookieValue, now, ipHash);
     // Refresh on every response: the browser's expiry slides with activity,
     // matching the server's idle window.
