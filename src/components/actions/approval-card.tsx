@@ -256,6 +256,10 @@ function Amount({ card, state }: { card: ActionCard; state: CardState }) {
 
 function Route({ card }: { card: ActionCard }) {
   if (!card.from_label && !card.to_label) return null;
+  // The balance change below already names where the money lands.
+  if (card.destination) {
+    return <p className="mt-3 text-sm font-bold text-muted">From {card.from_label}</p>;
+  }
   return (
     <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-muted">
       <span>{card.from_label}</span>
@@ -273,12 +277,14 @@ function DestinationChange({ card, state }: { card: ActionCard; state: CardState
   const direction = destination.after_cents < destination.before_cents ? -1 : 1;
   const after = offer === null ? destination.after_cents : destination.before_cents + direction * offer;
   return (
-    <p className="money mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-coin-sm bg-surface-soft px-3 py-2.5 text-sm font-bold">
-      <span className="mr-auto text-muted">{destination.label}</span>
-      <span className="text-subtle line-through decoration-1">{money(destination.before_cents)}</span>
-      <ArrowIcon className="h-3.5 w-3.5 text-subtle" />
-      <span className="text-foreground">{money(after)}</span>
-    </p>
+    <div className="mt-3 rounded-coin-sm bg-surface-soft px-3 py-2.5">
+      <p className="text-xs font-bold text-subtle">{destination.label}</p>
+      <p className="money mt-0.5 flex items-center gap-2 whitespace-nowrap text-sm font-bold">
+        <span className="text-subtle line-through decoration-1">{money(destination.before_cents)}</span>
+        <ArrowIcon className="h-3.5 w-3.5 shrink-0 text-subtle" />
+        <span className="text-base text-foreground">{money(after)}</span>
+      </p>
+    </div>
   );
 }
 

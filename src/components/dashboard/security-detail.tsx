@@ -7,7 +7,46 @@ import type { ChartPayload, HoldingView } from "../../contracts";
 import { money, signedMoney } from "../../lib/format";
 import { ChartCard } from "../charts/chart-card";
 import { BackIcon } from "../ui/icons";
+import { AnimatedMoney } from "../ui/motion";
 import { SectionTitle, stagger } from "./pieces";
+
+const TICK_MS = 1_800;
+/** A simulated quote wanders at most this far from today's close. */
+const WANDER = 0.004;
+
+/**
+ * A simulated live quote: every couple of seconds the price takes a small
+ * step around today's close. Display only. Orders always fill at the close,
+ * which the page says beside it.
+ */
+function useLiveQuote(closeCents: number): number {
+  const [quote, setQuote] = useState(closeCents);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setQuote((current) => {
+        const step = (Math.random() - 0.5) * closeCents * 0.0016;
+        const pullBack = (closeCents - current) * 0.15;
+        const next = current + step + pullBack;
+        const limit = closeCents * WANDER;
+        return Math.round(Math.max(closeCents - limit, Math.min(closeCents + limit, next)));
+      });
+    }, TICK_MS);
+    return () => clearInterval(timer);
+  }, [closeCents]);
+  return quote;
+}
+
+function LiveChip() {
+  return (
+    <span className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-subtle">
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="coin-pulse absolute inset-0 rounded-full bg-gain" />
+        <span className="relative h-1.5 w-1.5 rounded-full bg-gain" />
+      </span>
+      Live, simulated
+    </span>
+  );
+}
 
 interface SecurityPayload {
   security: { ticker: string; name: string; kind: string; sector: string; dividend_yield_bps: number };
@@ -51,18 +90,25 @@ function PriceHeader({ data }: { data: SecurityPayload }) {
   const prices = data.chart.data.map((row) => Number(row.value ?? 0));
   const last = prices.at(-1) ?? 0;
   const first = prices[0] ?? last;
-  const change = last - first;
+  const quote = useLiveQuote(last);
+  const change = quote - first;
   const percent = first ? `${((Math.abs(change) / first) * 100).toFixed(1)}%` : "";
   return (
     <header className="px-6 pt-7 sm:px-9 sm:pt-9">
-      <p className="text-sm font-bold text-subtle">
-        {data.security.name}{" "}
-        <span className="ml-1 rounded-full bg-surface-soft px-2 py-0.5 text-xs font-extrabold">{data.security.ticker}</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-bold text-subtle">
+          {data.security.name}{" "}
+          <span className="ml-1 rounded-full bg-surface-soft px-2 py-0.5 text-xs font-extrabold">{data.security.ticker}</span>
+        </p>
+        <LiveChip />
+      </div>
+      <p className="mt-1 text-[2.75rem] font-extrabold leading-none tracking-[-0.035em] sm:text-6xl">
+        <AnimatedMoney cents={quote} split />
       </p>
-      <p className="money mt-1 text-[2.75rem] font-extrabold leading-none tracking-[-0.035em] sm:text-6xl">{money(last)}</p>
       <p className={`money mt-3 text-base font-extrabold ${change >= 0 ? "text-gain" : "text-loss"}`}>
         {signedMoney(change, true)} ({percent}) <span className="font-semibold text-subtle">past year, per share</span>
       </p>
+      <p className="money mt-1 text-xs font-semibold text-subtle">Orders fill at today&rsquo;s close, {money(last)}.</p>
     </header>
   );
 }

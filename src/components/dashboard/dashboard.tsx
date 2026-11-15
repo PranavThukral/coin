@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import type { AccountView } from "../../contracts";
 import { api, unwrap, type AccountDetailPayload, type DashboardPayload } from "../../lib/api";
-import { money, signedMoney } from "../../lib/format";
+import { money } from "../../lib/format";
 import { ChartCard } from "../charts/chart-card";
 import { BackIcon } from "../ui/icons";
 import { AnimatedMoney } from "../ui/motion";
 import { NetWorthHero } from "./net-worth-hero";
 import { SecurityDetail } from "./security-detail";
-import { AccountList, HeroStats, SectionTitle, stagger, totalsOf, TransactionList, UpcomingList } from "./pieces";
+import { AccountList, ChangePill, HeroStats, SectionTitle, stagger, totalsOf, TransactionList, UpcomingList } from "./pieces";
 
 function Loading() {
   return (
@@ -61,14 +61,19 @@ function HoldingRow({ holding, index, onOpen }: { holding: Holding; index: numbe
       onKeyDown={(event) => event.key === "Enter" && onOpen(holding.ticker)}
     >
       <td className="py-3.5 pl-5 pr-3">
-        <span className="block font-extrabold">{holding.name}</span>
-        <span className="block text-xs font-semibold text-subtle">
-          {holding.ticker}, {holding.quantity} shares
+        <span className="flex items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-coin-sm bg-surface-soft font-mono text-[11px] font-medium text-muted">
+            {holding.ticker.replace(".CX", "")}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-extrabold">{holding.name}</span>
+            <span className="block text-xs font-semibold text-subtle">{holding.quantity} shares</span>
+          </span>
         </span>
       </td>
       <td className="money px-3 py-3.5 text-right font-extrabold">{money(holding.market_value_cents)}</td>
-      <td className={`money px-3 py-3.5 text-right font-extrabold ${gain >= 0 ? "text-gain" : "text-loss"}`}>
-        {signedMoney(gain, true)}
+      <td className="px-3 py-3.5 text-right">
+        <ChangePill cents={gain} />
       </td>
       <td className={`money py-3.5 pl-3 pr-5 text-right font-extrabold ${concentrated ? "text-warning" : ""}`}>
         {(holding.weight_of_portfolio * 100).toFixed(1)}%

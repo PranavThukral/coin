@@ -69,6 +69,12 @@ const GROUPS: { title: string; types: readonly AccountType[]; glyph: React.React
   { title: "Credit", types: ["credit_card"], glyph: <CardGlyph /> },
 ];
 
+/** A gain or loss as coloured text on a pale capsule. */
+export function ChangePill({ cents }: { cents: number }) {
+  const tone = cents >= 0 ? "bg-gain-soft text-gain" : "bg-loss-soft text-loss";
+  return <span className={`money rounded-full px-2 py-0.5 text-xs font-bold ${tone}`}>{signedMoney(cents, true)}</span>;
+}
+
 const KIND: Record<AccountType, string> = {
   chequing: "Chequing",
   hisa: "Savings",
@@ -85,8 +91,9 @@ function AccountNote({ account, today, gain }: { account: AccountView; today: st
   }
   if (gain !== undefined) {
     return (
-      <span className={`money ${gain >= 0 ? "text-gain" : "text-loss"}`}>
-        {signedMoney(gain, true)} <span className="text-subtle">all time</span>
+      <span className="flex items-center gap-1.5">
+        <ChangePill cents={gain} />
+        <span className="text-subtle">all time</span>
       </span>
     );
   }

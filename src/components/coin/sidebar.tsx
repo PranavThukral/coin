@@ -198,7 +198,7 @@ function Composer({ disabled, onSend }: { disabled: boolean; onSend: (text: stri
           rows={1}
           placeholder="Ask Coin about your money"
           aria-label="Message Coin"
-          className="max-h-32 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-[15px] font-medium outline-none placeholder:text-subtle"
+          className="coin-quiet-focus max-h-32 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-[15px] font-medium outline-none placeholder:text-subtle"
         />
         <button
           type="submit"

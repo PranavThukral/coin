@@ -34,7 +34,7 @@ function SeeScene() {
     <div className="flex h-full flex-col justify-between">
       <div>
         <p className="money text-2xl font-extrabold tracking-tight">$349,400</p>
-        <p className="money text-xs font-extrabold text-gain">+22.0% past year</p>
+        <p className="money text-xs font-extrabold text-gain">+19.4% past year</p>
       </div>
       <div className="coin-wipe" style={beat(8)}>
         <svg viewBox="0 0 280 72" className="block w-full overflow-visible" aria-hidden="true">
@@ -101,7 +101,7 @@ function FloatingCards() {
           <article className="coin-float rounded-coin-lg bg-surface p-3 shadow-coin-float">
             <div className="h-44 rounded-coin bg-surface-soft p-4">{card.scene}</div>
             <div className="px-3 pb-4 pt-5">
-              <h2 className="text-2xl font-extrabold tracking-tight">{card.title}</h2>
+              <h3 className="font-display text-3xl tracking-tight">{card.title}</h3>
               <p className="mt-1.5 text-[15px] font-medium leading-snug text-muted">{card.body}</p>
             </div>
           </article>
@@ -111,49 +111,97 @@ function FloatingCards() {
   );
 }
 
-function Hero() {
+const STATS = [
+  { label: "Rule checks on every action", value: "9" },
+  { label: "Requests in the test set", value: "40" },
+  { label: "Unsafe actions executed", value: "0" },
+  { label: "Automated tests", value: "463" },
+];
+
+/** What the tests measured, as a quiet strip of labelled figures. */
+function Stats() {
   return (
-    <section className="pb-12 pt-10 sm:pt-14">
-      <p className="coin-rise max-w-2xl text-lg font-semibold text-muted sm:text-xl">
-        AI financial agents are surging, so I decided to explore building my own.
-      </p>
-      <h1
-        className="coin-rise mt-3 max-w-5xl text-[2.5rem] font-extrabold leading-[1.05] tracking-[-0.035em] sm:text-5xl lg:text-6xl"
-        style={beat(1)}
-      >
-        Meet Coin, an agent that lets you take charge of your finances.
-      </h1>
-      <div className="coin-rise mt-8 flex flex-wrap items-center gap-3" style={beat(2)}>
-        <Link
-          href="/app"
-          className="rounded-full bg-accent px-7 py-3.5 text-base font-extrabold text-accent-ink shadow-coin-accent transition-transform hover:-translate-y-0.5"
-        >
+    <dl className="coin-rise flex flex-wrap gap-x-8 gap-y-3 font-mono text-[11px] uppercase tracking-wider text-white/55" style={beat(4)}>
+      {STATS.map((stat) => (
+        <div key={stat.label} className="flex items-center gap-2.5">
+          <dt>{stat.label}</dt>
+          <dd className="rounded-md border border-white/15 bg-white/[0.06] px-2 py-1 text-xs font-medium text-white">{stat.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function Nav() {
+  return (
+    <header className="flex items-center justify-between rounded-full border border-white/10 bg-white/[0.07] py-2 pl-5 pr-2 backdrop-blur-md">
+      <span className="flex items-center gap-2.5">
+        <Mascot size={26} />
+        <span className="font-display text-2xl tracking-tight text-white">Coin</span>
+      </span>
+      <nav className="flex items-center gap-1.5 text-sm font-bold">
+        <Link href="/demo" className="rounded-full px-4 py-2 text-white/80 transition-colors hover:text-white">
+          Scripted demo
+        </Link>
+        <Link href="/app" className="rounded-full bg-white px-4 py-2 text-[#0b1030] transition-transform hover:-translate-y-0.5">
           Try it live
         </Link>
-        <Link
-          href="/demo"
-          className="rounded-full bg-surface px-7 py-3.5 text-base font-extrabold text-foreground shadow-coin transition-transform hover:-translate-y-0.5"
-        >
-          Watch the scripted demo
-        </Link>
+      </nav>
+    </header>
+  );
+}
+
+/** The hero: a deep field of blue with one large coin, and the pitch set in a serif. */
+function Hero() {
+  return (
+    <section className="coin-hero relative overflow-hidden text-white">
+      <div className="pointer-events-none absolute -right-40 top-24 hidden opacity-95 md:block lg:-right-24" aria-hidden="true">
+        <div className="coin-float">
+          <Mascot size={620} />
+        </div>
       </div>
-      <p className="coin-rise mt-5 text-sm font-semibold text-subtle" style={beat(3)}>
-        Completely synthetic data.
-      </p>
+      <div className="relative mx-auto flex min-h-[44rem] max-w-6xl flex-col px-5 pb-12 pt-5 sm:px-8 lg:px-10">
+        <Nav />
+        <div className="mt-auto max-w-3xl pt-24">
+          <p className="coin-rise font-display text-xl italic text-white/75 sm:text-2xl">
+            AI financial agents are surging, so I decided to explore building my own.
+          </p>
+          <h1 className="coin-rise mt-4 font-display text-[2.9rem] leading-[1.02] tracking-[-0.02em] sm:text-6xl lg:text-7xl" style={beat(1)}>
+            Meet Coin, an agent that lets you take charge of your finances.
+          </h1>
+          <div className="coin-rise mt-9 flex flex-wrap items-center gap-3" style={beat(2)}>
+            <Link href="/app" className="rounded-full bg-white px-7 py-3.5 text-base font-bold text-[#0b1030] transition-transform hover:-translate-y-0.5">
+              Try it live
+            </Link>
+            <Link href="/demo" className="rounded-full border border-white/40 px-7 py-3.5 text-base font-bold text-white transition-colors hover:bg-white/10">
+              Watch the scripted demo
+            </Link>
+          </div>
+          <p className="coin-rise mt-5 text-sm font-medium text-white/55" style={beat(3)}>
+            Completely synthetic data.
+          </p>
+        </div>
+        <div className="mt-14 border-t border-white/10 pt-6">
+          <Stats />
+        </div>
+      </div>
     </section>
   );
 }
 
 export default function Landing() {
   return (
-    <main className="coin-canvas min-h-dvh overflow-x-clip text-foreground">
-      <div className="mx-auto max-w-6xl px-5 pb-20 pt-7 sm:px-8 lg:px-10">
-        <header className="flex items-center gap-2.5">
-          <Mascot size={32} />
-          <span className="text-xl font-extrabold tracking-tight">Coin</span>
-        </header>
-        <Hero />
-        <FloatingCards />
+    <main className="min-h-dvh overflow-x-clip text-foreground">
+      <Hero />
+      <div className="coin-canvas">
+        <div className="mx-auto max-w-6xl px-5 pb-24 pt-20 sm:px-8 lg:px-10">
+          <h2 className="max-w-3xl font-display text-4xl leading-[1.08] tracking-[-0.015em] sm:text-5xl">
+            Ask, see, approve. <span className="text-subtle">The model proposes; code decides what can execute.</span>
+          </h2>
+          <div className="mt-12">
+            <FloatingCards />
+          </div>
+        </div>
       </div>
     </main>
   );
