@@ -23,8 +23,8 @@ export function setModelForTests(model: AgentModel | null): void {
   testModel = model;
 }
 
-type Emit = (event: ChatEvent) => void;
-type StreamControls = { emit: Emit; clientGone: () => boolean };
+export type Emit = (event: ChatEvent) => void;
+export type StreamControls = { emit: Emit; clientGone: () => boolean };
 
 const STREAM_HEADERS = { "content-type": "text/event-stream", "cache-control": "no-cache, no-transform" };
 const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment.";
@@ -34,7 +34,7 @@ const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment.";
  * turns into a no-op instead of throwing, so the turn can still finish its
  * bookkeeping (recording what the model call cost, saving the reply).
  */
-function streamResponse(run: (controls: StreamControls) => Promise<void>): Response {
+export function streamResponse(run: (controls: StreamControls) => Promise<void>): Response {
   const encoder = new TextEncoder();
   let open = true;
 

@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AGENT_LIMITS, type AccountId } from "../../contracts";
-import type { ChatMessage, ChatState, ChatTransport } from "../../lib/chat";
+import type { ChatMessage, ChatState } from "../../lib/chat";
 import { ApprovalCard } from "../actions/approval-card";
 import { ChartCard } from "../charts/chart-card";
 import { Mascot, type MascotMood } from "./mascot";
 import { OverviewPanel } from "./overview-panel";
-import { useCoinChat, type CardControls } from "./use-coin-chat";
+import type { CardControls, useCoinChat } from "./use-coin-chat";
 
 const SUGGESTIONS = [
   "Where did my money go this month?",
@@ -136,18 +136,22 @@ function Composer({ disabled, onSend }: { disabled: boolean; onSend: (text: stri
   );
 }
 
+/** The conversation state and actions, owned by the app shell (see useCoinChat). */
+export type CoinConversation = ReturnType<typeof useCoinChat>;
+
 export function CoinSidebar({
-  transport,
+  coin,
   viewingAccountId,
-  onActionSettled,
   onCollapse,
+  replayOnly = false,
 }: {
-  transport: ChatTransport;
+  coin: CoinConversation;
   viewingAccountId: AccountId | null;
-  onActionSettled: () => void;
   onCollapse: () => void;
+  /** Scripted demo: Coin answers only the demo's own questions. */
+  replayOnly?: boolean;
 }) {
-  const { chat, send, controls } = useCoinChat(transport, onActionSettled);
+  const { chat, send, controls } = coin;
   const scroller = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -175,7 +179,7 @@ export function CoinSidebar({
 
       <div ref={scroller} className="flex-1 space-y-5 overflow-y-auto p-4">
         <OverviewPanel key={viewingAccountId ?? "all"} accountId={viewingAccountId} />
-        {chat.messages.length === 0 && (
+        {chat.messages.length === 0 && !replayOnly && (
           <div className="flex flex-wrap gap-2">
             {SUGGESTIONS.map((text) => (
               <button
@@ -194,7 +198,17 @@ export function CoinSidebar({
         ))}
       </div>
 
-      <Composer disabled={chat.busy} onSend={(text) => send(text, viewingAccountId)} />
+      {replayOnly ? (
+        <p className="border-t border-border p-4 text-sm font-semibold text-muted">
+          This is a replay with the real rules and your own copy of the data.{" "}
+          <a href="/app" className="font-extrabold text-accent hover:underline">
+            Try live mode
+          </a>{" "}
+          to ask Coin anything.
+        </p>
+      ) : (
+        <Composer disabled={chat.busy} onSend={(text) => send(text, viewingAccountId)} />
+      )}
     </aside>
   );
 }

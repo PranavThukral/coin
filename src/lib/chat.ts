@@ -130,28 +130,35 @@ export async function* readEventStream(body: ReadableStream<Uint8Array>): AsyncI
 }
 
 /** Live mode: POST /api/chat and stream the reply. */
-export const liveTransport: ChatTransport = {
-  async *send(message, viewingAccountId, signal) {
-    let response: Response;
-    try {
-      response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, viewing_account_id: viewingAccountId }),
-        signal,
-      });
-    } catch {
-      yield { type: "error", code: "model_error", message: "Coin can't be reached right now. Try again in a moment." };
-      return;
-    }
-    if (!response.ok || !response.body) {
-      const body = await response.json().catch(() => ({}));
-      const fallback = response.status === 404
-        ? "Live mode isn't connected yet. The scripted demo works."
-        : "Coin can't answer right now. Try again in a moment.";
-      yield { type: "error", code: "model_error", message: body.error ?? fallback };
-      return;
-    }
-    yield* readEventStream(response.body);
-  },
-};
+/** POST a message to a streaming endpoint and yield its events. */
+function streamingTransport(path: string, notFoundMessage: string): ChatTransport {
+  return {
+    async *send(message, viewingAccountId, signal) {
+      let response: Response;
+      try {
+        response = await fetch(path, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ message, viewing_account_id: viewingAccountId }),
+          signal,
+        });
+      } catch {
+        yield { type: "error", code: "model_error", message: "Coin can't be reached right now. Try again in a moment." };
+        return;
+      }
+      if (!response.ok || !response.body) {
+        const body = await response.json().catch(() => ({}));
+        const fallback = response.status === 404 ? notFoundMessage : "Coin can't answer right now. Try again in a moment.";
+        yield { type: "error", code: "model_error", message: body.error ?? fallback };
+        return;
+      }
+      yield* readEventStream(response.body);
+    },
+  };
+}
+
+/** Live mode: Coin on the model, POST /api/chat. */
+export const liveTransport = streamingTransport("/api/chat", "Live mode isn't connected yet. The scripted demo works.");
+
+/** Scripted demo: the same pipeline without a model, POST /api/demo/chat. */
+export const demoTransport = streamingTransport("/api/demo/chat", "That isn't one of the demo's questions.");
