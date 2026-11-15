@@ -102,7 +102,7 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
     },
   },
   {
-    label: "Blocked",
+    label: "A smaller amount offered",
     card: {
       ...base,
       status: "blocked",
@@ -111,6 +111,7 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
       balance_after_cents: -207_226,
       primary_message: r4Message,
       max_passing_amount_cents: 234_012,
+      destination: { label: "Rewards Credit Card", before_cents: 491_238, after_cents: 0 },
       checks: checks({
         R3_new_recipient: { outcome: "skip" },
         R4_enough_money: { outcome: "fail", message: r4Message, max: 234_012 },
@@ -128,6 +129,37 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
     card: { ...base, status: "executed", title: "Paid your credit card", executed_at: "2026-11-15T12:01:00Z" },
   },
   { label: "Cancelled", card: { ...base, status: "cancelled", title: "Pay your credit card" } },
+  {
+    label: "Blocked",
+    card: {
+      ...base,
+      type: "etransfer",
+      status: "blocked",
+      title: "Send to New contact",
+      amount_cents: 50_000,
+      to_label: "New contact",
+      primary_message: "You didn’t ask me to move money.",
+      checks: checks({ R0_intent: { outcome: "fail", message: "You didn’t ask me to move money." } }),
+    },
+  },
+];
+
+const step = (id: string, title: string, amount: number, type: ActionCard["type"] = "trade"): ActionCard => ({
+  ...base,
+  action_id: id,
+  type,
+  title,
+  amount_cents: amount,
+  origin: "plan",
+});
+
+/** A sale plan: four sales, then the proceeds move to chequing. */
+export const examplePlan: ActionCard[] = [
+  step("plan-1", "Sell 16 shares of FERN.CX", 115_360),
+  step("plan-2", "Sell 26 shares of LUMA.CX", 123_890),
+  step("plan-3", "Sell 7 shares of NRTH.CX", 127_680),
+  step("plan-4", "Sell 37 shares of ORCA.CX", 125_430),
+  { ...step("plan-5", "Move to Everyday Chequing", 492_360, "transfer"), to_label: "Everyday Chequing" },
 ];
 
 export const chartSeries = [

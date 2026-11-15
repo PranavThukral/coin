@@ -31,6 +31,8 @@ export interface UpcomingEvent {
 export interface DashboardPayload {
   today: string;
   accounts: AccountView[];
+  /** All-time gain or loss of each investment account's holdings, by account id. */
+  account_gains: Record<string, number>;
   recent_transactions: Wrapped<Transaction[]>;
   upcoming: Wrapped<UpcomingEvent[]>;
   /** Net worth now minus net worth at the end of last month. */

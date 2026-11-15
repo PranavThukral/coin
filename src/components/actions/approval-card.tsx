@@ -25,18 +25,27 @@ export interface CardHandlers {
   onWindowElapsed?: () => void;
 }
 
-type CardState = "proposed" | "confirm" | "blocked" | "pending_undo" | "executed" | "cancelled";
+type CardState = "proposed" | "confirm" | "offer" | "blocked" | "pending_undo" | "executed" | "cancelled";
+
+/** The largest amount that passes, when a smaller amount is all that stands in the way. */
+function offeredAmount(card: ActionCard): number | null {
+  const offer = card.max_passing_amount_cents;
+  return card.status === "blocked" && offer !== null && offer > 0 ? offer : null;
+}
 
 function stateOf(card: ActionCard): CardState {
   if (card.status === "proposed" && card.requires_second_confirmation && !card.second_confirmed) {
     return "confirm";
   }
+  // Not a refusal: the full amount doesn't fit, a smaller one does.
+  if (offeredAmount(card) !== null) return "offer";
   return card.status;
 }
 
 const FRAME: Record<CardState, string> = {
   proposed: "border-transparent",
   confirm: "border-transparent",
+  offer: "border-transparent",
   blocked: "border-transparent",
   pending_undo: "border-pending",
   executed: "border-gain coin-executed",
@@ -56,6 +65,7 @@ interface Look {
 const LOOK: Record<CardState, Look> = {
   proposed: { chip: "bg-border/70 text-muted", icon: <CheckIcon />, text: "Checked. Ready for you", steps: 1, bar: "bg-accent" },
   confirm: { chip: "bg-warning-soft text-warning", icon: <AlertIcon />, text: "New recipient: confirm first", steps: 1, bar: "bg-warning" },
+  offer: { chip: "bg-accent-soft text-accent-text", icon: <AlertIcon />, text: "The full amount doesn’t fit. This does", steps: 1, bar: "bg-accent" },
   blocked: { chip: "bg-loss-soft text-blocked", icon: <CrossIcon />, text: "Blocked by a check", steps: 1, bar: "bg-blocked" },
   pending_undo: { chip: "bg-pending-soft text-pending", icon: <ClockIcon />, text: "Approved. You can still undo", steps: 2, bar: "bg-pending" },
   executed: { chip: "bg-gain-soft text-gain", icon: <CheckIcon />, text: "Done", steps: 3, bar: "bg-gain" },
@@ -160,8 +170,8 @@ function CheckList({
         return (
           <Problem
             key={check.rule}
-            tone={failed ? "bg-loss-soft text-blocked" : "bg-warning-soft text-warning"}
-            icon={failed ? <CrossIcon /> : <AlertIcon />}
+            tone={failed && !offersAmount ? "bg-loss-soft text-blocked" : "bg-warning-soft text-warning"}
+            icon={failed && !offersAmount ? <CrossIcon /> : <AlertIcon />}
             index={index}
           >
             {message}
@@ -189,7 +199,8 @@ function RecipientConfirmation({ name, onEmail }: { name: string; onEmail: (emai
   );
 }
 
-const BUTTON = "rounded-full px-5 py-2.5 text-sm font-extrabold transition-transform active:scale-[0.97] disabled:opacity-50";
+// Buttons share the row evenly and wrap onto their own lines when the panel is narrow.
+const BUTTON = "min-w-[7.5rem] flex-1 whitespace-nowrap rounded-full px-5 py-2.5 text-center text-sm font-extrabold transition-transform active:scale-[0.97] disabled:opacity-50";
 const PRIMARY = `${BUTTON} bg-accent text-accent-ink shadow-coin-accent hover:bg-accent-strong`;
 const SECONDARY = `${BUTTON} bg-border/70 text-foreground hover:bg-border`;
 
@@ -210,11 +221,11 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
       </>
     );
   }
-  if (state === "blocked" && card.max_passing_amount_cents !== null) {
-    const amount = card.max_passing_amount_cents;
+  const offer = offeredAmount(card);
+  if (state === "offer" && offer !== null) {
     return (
-      <button type="button" className={`money ${PRIMARY}`} disabled={busy} onClick={() => props.onUseInstead?.(amount)}>
-        Use {money(amount)} instead
+      <button type="button" className={PRIMARY} disabled={busy} onClick={() => props.onUseInstead?.(offer)}>
+        {card.type === "bill_payment" ? "Pay this amount" : "Use this amount"}
       </button>
     );
   }
@@ -234,7 +245,8 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
 }
 
 function Amount({ card, state }: { card: ActionCard; state: CardState }) {
-  const value = card.amount_cents !== null ? money(card.amount_cents) : "\u2014";
+  const shown = state === "offer" ? offeredAmount(card) : card.amount_cents;
+  const value = shown !== null ? money(shown) :"\u2014";
   const size = "money mt-4 text-4xl font-extrabold leading-none tracking-[-0.03em]";
   if (state === "cancelled") {
     return <p className={`${size} inline-block text-subtle coin-struck`}>{value}</p>;
@@ -253,7 +265,27 @@ function Route({ card }: { card: ActionCard }) {
   );
 }
 
+/** "Rewards Credit Card  $4,912.38 -> $2,572.26": what the receiving balance becomes. */
+function DestinationChange({ card, state }: { card: ActionCard; state: CardState }) {
+  const destination = card.destination;
+  if (!destination || state === "cancelled" || state === "blocked") return null;
+  const offer = state === "offer" ? offeredAmount(card) : null;
+  const direction = destination.after_cents < destination.before_cents ? -1 : 1;
+  const after = offer === null ? destination.after_cents : destination.before_cents + direction * offer;
+  return (
+    <p className="money mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-coin-sm bg-surface-soft px-3 py-2.5 text-sm font-bold">
+      <span className="mr-auto text-muted">{destination.label}</span>
+      <span className="text-subtle line-through decoration-1">{money(destination.before_cents)}</span>
+      <ArrowIcon className="h-3.5 w-3.5 text-subtle" />
+      <span className="text-foreground">{money(after)}</span>
+    </p>
+  );
+}
+
 function Outcome({ card, state }: { card: ActionCard; state: CardState }) {
+  if (state === "offer" && card.amount_cents !== null) {
+    return <p className="money mt-1 text-sm font-semibold text-subtle">You asked for {money(card.amount_cents)}.</p>;
+  }
   if (state === "executed" && card.balance_after_cents !== null) {
     return (
       <p className="money mt-2 text-sm font-bold text-gain">
@@ -282,7 +314,7 @@ export function ApprovalCard({
 }: { card: ActionCard; busy?: boolean; error?: string | null } & CardHandlers) {
   const [email, setEmail] = useState("");
   const state = stateOf(card);
-  const showChecks = state === "proposed" || state === "confirm" || state === "blocked";
+  const showChecks = state === "proposed" || state === "confirm" || state === "offer" || state === "blocked";
   const recipientName = (card.to_label ?? "this person").replace(/\s*\(new recipient\)$/, "");
 
   return (
@@ -302,12 +334,13 @@ export function ApprovalCard({
         <Amount card={card} state={state} />
         <Route card={card} />
         <Outcome card={card} state={state} />
+        <DestinationChange card={card} state={state} />
 
         {state === "confirm" && <RecipientConfirmation name={recipientName} onEmail={setEmail} />}
         {showChecks && (
           <CheckList
             checks={card.checks}
-            offersAmount={state === "blocked" && card.max_passing_amount_cents !== null}
+            offersAmount={state === "offer"}
             blockedReason={state === "blocked" ? blockedReasonOf(card) : null}
           />
         )}

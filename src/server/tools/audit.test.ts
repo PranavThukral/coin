@@ -96,15 +96,15 @@ describe("Planted facts are found", () => {
 });
 
 describe("Numbers agree everywhere", () => {
-  it("the category chart equals summarize_spending for the same range", async () => {
+  it("the category chart shows summarize_spending's five largest for the same range", async () => {
     const range = { from: "2026-12-01", to: "2026-12-31" };
     const rows = unwrap<SpendingRow[]>(
       await tool("summarize_spending", { ...range, group_by: "category", account_id: null, category: null }),
     );
     const chart = await buildChart(f.db, f.sessionId, { ...chartArgs, ...range, source: "spending_by_category" });
-    const chartTotal = chart.data.reduce((s, d) => s + Number(d[chart.series[0].key] ?? 0), 0);
-    const toolTotal = rows.reduce((s, r) => s + r.total_cents, 0);
-    expect(Math.round(chartTotal)).toBe(Math.round(toolTotal));
+    // The chart shows the five largest categories, each with the tool's own figure.
+    const largest = [...rows].sort((a, b) => b.total_cents - a.total_cents).slice(0, 5);
+    expect(chart.data.map((d) => [d.x, d[chart.series[0].key]])).toEqual(largest.map((r) => [r.key, r.total_cents]));
   });
 
   it("transfers between own accounts never count as spending", async () => {

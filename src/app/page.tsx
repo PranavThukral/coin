@@ -115,7 +115,7 @@ function Hero() {
   return (
     <section className="pb-12 pt-10 sm:pt-14">
       <p className="coin-rise max-w-2xl text-lg font-semibold text-muted sm:text-xl">
-        AI financial agents are surging. I decided to explore building my own.
+        AI financial agents are surging, so I decided to explore building my own.
       </p>
       <h1
         className="coin-rise mt-3 max-w-5xl text-[2.5rem] font-extrabold leading-[1.05] tracking-[-0.035em] sm:text-5xl lg:text-6xl"
@@ -138,7 +138,7 @@ function Hero() {
         </Link>
       </div>
       <p className="coin-rise mt-5 text-sm font-semibold text-subtle" style={beat(3)}>
-        Made-up data. An AI financial agent demo.
+        Completely synthetic data.
       </p>
     </section>
   );

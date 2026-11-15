@@ -10,16 +10,35 @@ type Result = Pick<ChartPayload, "data"> &
   Partial<Pick<ChartPayload, "kind" | "x" | "series" | "highlight">>;
 type Builder = (context: Context) => Promise<Result>;
 
+/** A breakdown shows its five largest rows; a longer list hides what matters. */
+const MOST_ROWS = 5;
+
+type Row = { x: string; value: number };
+
+/** The largest rows, plus the one the user asked about if it didn't make the cut. */
+function largestRows(rows: Row[], asked: string | null): Row[] {
+  const sorted = [...rows].sort((a, b) => b.value - a.value);
+  const top = sorted.slice(0, MOST_ROWS);
+  const askedRow = sorted.find(row => row.x === asked);
+  if (askedRow && !top.includes(askedRow)) top.push(askedRow);
+  return top;
+}
+
 async function spendingChart(context: Context, group: "category" | "month" | "merchant"): Promise<Result> {
   const { db, sid, req, from, to } = context;
   const rows = spending(await q.transactions(db, sid), from, to, group, req.account_id, req.category);
   let data = rows.map(row => ({ x: row.key, value: row.total_cents }));
-  if (group === "merchant") data = data.sort((a, b) => b.value - a.value).slice(0, 10);
+  if (group === "merchant") data = largestRows(data, null);
   return { data, kind: "bar", x: { key: "x", type: group === "month" ? "date" : "category" } };
 }
 
-async function spendingByCategory(context: Context): Promise<Result> {
-  return spendingChart(context, "category");
+/** Every category is compared, and the asked one is called out among the five largest. */
+async function spendingByCategory({ db, sid, req, from, to }: Context): Promise<Result> {
+  const rows = spending(await q.transactions(db, sid), from, to, "category", req.account_id);
+  const data = largestRows(rows.map(row => ({ x: row.key, value: row.total_cents })), req.category);
+  const asked = data.find(row => row.x === req.category);
+  const highlight = asked ? { x: asked.x, series: "value", label: "The one you asked about" } : null;
+  return { data, highlight, kind: "bar", x: { key: "x", type: "category" } };
 }
 
 async function spendingByMonth(context: Context): Promise<Result> {
@@ -47,8 +66,15 @@ async function categoryChange({ db, sid, req, from, to }: Context): Promise<Resu
   if (largest && largest.b > largest.a) {
     highlight = { x: largest.x, series: "b", label: "Largest increase" };
   }
+  // The five largest by either period, always keeping the biggest mover and any asked category.
+  const bySize = [...data].sort((l, r) => Math.max(r.a, r.b) - Math.max(l.a, l.b));
+  const shown = bySize.slice(0, MOST_ROWS);
+  for (const key of [highlight?.x, req.category]) {
+    const row = data.find(item => item.x === key);
+    if (row && !shown.includes(row)) shown.push(row);
+  }
   return {
-    data, highlight, kind: "grouped_bar", x: { key: "x", type: "category" },
+    data: shown, highlight, kind: "grouped_bar", x: { key: "x", type: "category" },
     series: [{ key: "a", label: "Previous" }, { key: "b", label: "Current" }],
   };
 }
@@ -60,7 +86,8 @@ async function allocationByHolding({ db, sid, req }: Context): Promise<Result> {
   for (const holding of holdings) {
     values.set(holding.ticker, (values.get(holding.ticker) ?? 0) + holding.market_value_cents);
   }
-  const data = [...values].map(([x, value]) => ({ x, value }));
+  const names = new Map(holdings.map(holding => [holding.ticker, holding.name]));
+  const data = [...values].map(([x, value]) => ({ x, value, name: names.get(x) ?? x }));
   const total = data.reduce((sum, row) => sum + row.value, 0);
   const biggest = [...data].sort((a, b) => b.value - a.value)[0];
   let highlight: ChartPayload["highlight"] = null;
@@ -73,11 +100,15 @@ async function allocationByHolding({ db, sid, req }: Context): Promise<Result> {
 async function allocationByAccount({ db, sid }: Context): Promise<Result> {
   const accounts = await q.accounts(db, sid);
   const holdings = await holdingViews(db, sid);
-  const data = accounts.filter(account => account.type !== "credit_card").map(account => ({
-    x: account.name,
-    value: account.balance_cents + holdings.filter(h => h.account_id === account.id)
-      .reduce((sum, h) => sum + h.market_value_cents, 0),
-  }));
+  const data = accounts.filter(account => account.type !== "credit_card").map(account => {
+    const held = holdings.filter(h => h.account_id === account.id);
+    return {
+      x: account.name,
+      value: account.balance_cents + held.reduce((sum, h) => sum + h.market_value_cents, 0),
+      // What its investments have gained since they were bought; null for cash accounts.
+      gain: held.length ? held.reduce((sum, h) => sum + h.unrealized_gain_cents, 0) : null,
+    };
+  });
   return { data, kind: "donut", x: { key: "x", type: "category" } };
 }
 

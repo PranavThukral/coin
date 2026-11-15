@@ -10,7 +10,7 @@ import {
   type Transaction,
 } from "../../contracts";
 import type { UpcomingEvent } from "../../lib/api";
-import { money, relativeDay, shortDate, signedMoney } from "../../lib/format";
+import { relativeDay, shortDate, signedMoney } from "../../lib/format";
 import { CardGlyph, CashGlyph, ChevronIcon, TrendGlyph } from "../ui/icons";
 import { AnimatedMoney, useChanged } from "../ui/motion";
 
@@ -69,17 +69,34 @@ const GROUPS: { title: string; types: readonly AccountType[]; glyph: React.React
   { title: "Credit", types: ["credit_card"], glyph: <CardGlyph /> },
 ];
 
-function accountSubtitle(account: AccountView, today: string): string {
+const KIND: Record<AccountType, string> = {
+  chequing: "Chequing",
+  hisa: "Savings",
+  tfsa: "Tax-free savings",
+  rrsp: "Retirement savings",
+  non_registered: "Investing",
+  credit_card: "Credit card",
+};
+
+/** Under the name: the card's due date, an investment account's all-time gain, or the kind of account. */
+function AccountNote({ account, today, gain }: { account: AccountView; today: string; gain: number | undefined }) {
   if (account.type === "credit_card" && account.statement_due_date) {
-    return `Statement due ${relativeDay(account.statement_due_date, today)}`;
+    return <span className="text-loss">Statement due {relativeDay(account.statement_due_date, today)}</span>;
   }
-  if (account.market_value_cents !== null) return `Holdings ${money(account.market_value_cents)}`;
-  return `Ends ${account.mask}`;
+  if (gain !== undefined) {
+    return (
+      <span className={`money ${gain >= 0 ? "text-gain" : "text-loss"}`}>
+        {signedMoney(gain, true)} <span className="text-subtle">all time</span>
+      </span>
+    );
+  }
+  return <span>{KIND[account.type]}</span>;
 }
 
-function AccountRow({ account, today, glyph, index, onOpen }: {
+function AccountRow({ account, today, gain, glyph, index, onOpen }: {
   account: AccountView;
   today: string;
+  gain: number | undefined;
   glyph: React.ReactNode;
   index: number;
   onOpen: (account: AccountView) => void;
@@ -99,29 +116,35 @@ function AccountRow({ account, today, glyph, index, onOpen }: {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-extrabold">{account.name}</span>
-        <span className="block truncate text-sm font-semibold text-subtle">{accountSubtitle(account, today)}</span>
+        <span className="block truncate text-sm font-bold text-subtle">
+          <AccountNote account={account} today={today} gain={gain} />
+        </span>
       </span>
-      <AnimatedMoney
-        cents={account.total_value_cents}
-        className={`shrink-0 text-base font-extrabold sm:text-lg ${account.total_value_cents < 0 ? "text-loss" : ""}`}
-      />
+      <span className="shrink-0 text-right">
+        {/* A card shows what is owed as a plain balance; its due date carries the urgency. */}
+        <AnimatedMoney cents={Math.abs(account.total_value_cents)} className="block text-base font-extrabold sm:text-lg" />
+        <span className="money block text-xs font-bold tracking-wide text-subtle">
+          <span aria-hidden="true">&bull;&bull;&bull;&bull;</span> {account.mask}
+        </span>
+      </span>
       <ChevronIcon className="h-4 w-4 shrink-0 text-border-strong transition-transform group-hover:translate-x-0.5 group-hover:text-muted" />
     </button>
   );
 }
 
-export function AccountList({ accounts, today, onOpen }: {
+export function AccountList({ accounts, gains, today, onOpen }: {
   accounts: AccountView[];
+  gains: Record<string, number>;
   today: string;
   onOpen: (account: AccountView) => void;
 }) {
   return (
     <section>
       <SectionTitle>Accounts</SectionTitle>
-      <div className={`${CARD} space-y-4 p-3`}>
+      <div className="space-y-4">
         {GROUPS.map((group) => (
-          <div key={group.title}>
-            <p className="px-3 pb-1 pt-2 text-xs font-extrabold text-subtle">{group.title}</p>
+          <div key={group.title} className={`${CARD} p-3`}>
+            <p className="px-3 pb-1 pt-2 text-xs font-extrabold uppercase tracking-wider text-subtle">{group.title}</p>
             {accounts
               .filter((a) => group.types.includes(a.type))
               .map((account) => (
@@ -129,6 +152,7 @@ export function AccountList({ accounts, today, onOpen }: {
                   key={account.id}
                   account={account}
                   today={today}
+                  gain={gains[account.id]}
                   glyph={group.glyph}
                   index={accounts.indexOf(account)}
                   onOpen={onOpen}

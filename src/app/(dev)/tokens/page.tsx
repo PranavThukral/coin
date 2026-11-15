@@ -1,10 +1,11 @@
 // Design review page (dev only), v3. Renders Coin's identity in light and
 // dark: the palette, type, the net worth hero, charts and every card state.
 import { ApprovalCardPreview } from "../../../components/actions/approval-card";
+import { PlanCardPreview } from "../../../components/actions/plan-card";
 import { Replay } from "../../../components/ui/live-bits";
 import { MASCOT_OPTIONS, Mascot, type MascotMood } from "../../../components/coin/mascot";
 import { areaPath, plot, smoothPath, type Scale } from "../../../lib/chart-path";
-import { chartSeries, exampleCards, money, outflow } from "./preview-data";
+import { chartSeries, exampleCards, examplePlan, money, outflow } from "./preview-data";
 
 const GREYS = ["grey-0", "grey-50", "grey-100", "grey-200", "grey-300", "grey-500", "grey-700", "grey-900"];
 
@@ -316,6 +317,10 @@ function ActionCards() {
             </div>
           );
         })}
+        <div>
+          <p className="mb-3 text-sm font-extrabold text-muted">A sale plan</p>
+          <PlanCardPreview cards={examplePlan} />
+        </div>
       </div>
       <div className="mt-8">
         <OutflowMeter />

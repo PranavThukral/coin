@@ -217,7 +217,12 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
         <main className={`min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 lg:px-10 ${demo ? "pb-60 lg:pb-10" : "pb-24"}`}>
           <div className="mx-auto max-w-5xl">
             <TopBar mode={mode} />
-            <Dashboard openAccountId={viewing} onOpenAccount={setOpenAccount} refreshKey={refreshKey} />
+            <Dashboard
+              openAccountId={viewing}
+              onOpenAccount={setOpenAccount}
+              refreshKey={refreshKey}
+              onAsk={demo ? undefined : (question) => coin.send(question, viewing)}
+            />
           </div>
         </main>
         {demo && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} />}

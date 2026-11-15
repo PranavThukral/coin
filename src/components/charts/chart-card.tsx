@@ -24,17 +24,15 @@ import {
 } from "recharts";
 import type { ChartPayload } from "../../contracts";
 import { compactMoney, money, shortDate, signedMoney } from "../../lib/format";
-import { useReducedMotion } from "../ui/motion";
 
 const SERIES_COLOURS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5", "--chart-6"];
 const colour = (index: number) => `var(${SERIES_COLOURS[Math.min(index, SERIES_COLOURS.length - 1)]})`;
 
 const AXIS_TICK = { fill: "var(--subtle)", fontSize: 11, fontWeight: 700 };
 
-/** How every mark animates in. Still when the visitor asked for less motion. */
+/** How every mark animates in: drawn in place, with no travel. */
 function useReveal() {
-  const still = useReducedMotion();
-  return { isAnimationActive: !still, animationDuration: 1100, animationEasing: "ease-out" as const };
+  return { isAnimationActive: true, animationDuration: 1100, animationEasing: "ease-out" as const };
 }
 
 function humanize(value: string): string {
@@ -117,15 +115,37 @@ function TrendSummary({ chart }: { chart: ChartPayload }) {
   );
 }
 
-function DonutLegend({ slices, total, highlight }: { slices: Slice[]; total: number; highlight: string | null }) {
+/** One slice: its name, a bar for its share, what it is worth, and its gain when the chart carries one. */
+function DonutRow({ slice, total, index }: { slice: Slice; total: number; index: number }) {
+  const share = total ? slice.value / total : 0;
   return (
-    <ul className="min-w-0 space-y-1.5 text-sm">
+    <li className="coin-rise" style={{ "--i": index + 4 } as React.CSSProperties}>
+      <div className="flex items-baseline gap-2 text-sm">
+        <span className="inline-block h-2.5 w-2.5 shrink-0 self-center rounded-full" style={{ background: slice.fill }} />
+        <span className="min-w-0 truncate font-extrabold">{slice.label}</span>
+        {slice.label !== slice.name && <span className="hidden shrink-0 text-xs font-bold text-subtle @md:inline">{slice.name}</span>}
+        <span className="money ml-auto shrink-0 font-extrabold">{money(slice.value)}</span>
+        <span className="money w-10 shrink-0 text-right text-xs font-extrabold text-muted">{Math.round(share * 100)}%</span>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2 pl-[18px]">
+        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-soft">
+          <span className="coin-fill block h-full rounded-full" style={{ width: `${share * 100}%`, background: slice.fill }} />
+        </span>
+        {slice.gain !== null && (
+          <span className={`money shrink-0 text-xs font-extrabold ${slice.gain >= 0 ? "text-gain" : "text-loss"}`}>
+            {signedMoney(slice.gain, true)}
+          </span>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function DonutLegend({ slices, total }: { slices: Slice[]; total: number }) {
+  return (
+    <ul className="min-w-0 space-y-3">
       {slices.map((slice, i) => (
-        <li key={slice.name} className="coin-rise flex items-center gap-2 font-semibold" style={{ "--i": i + 4 } as React.CSSProperties}>
-          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: slice.fill }} />
-          <span className={`truncate ${slice.name === highlight ? "font-extrabold text-foreground" : "text-muted"}`}>{slice.name}</span>
-          <span className="money ml-auto font-extrabold">{total ? `${Math.round((slice.value / total) * 100)}%` : ""}</span>
-        </li>
+        <DonutRow key={slice.name} slice={slice} total={total} index={i} />
       ))}
     </ul>
   );
@@ -135,8 +155,13 @@ const DONUT_SLICES = 6;
 const OTHER_COLOUR = "var(--border-strong)";
 
 interface Slice {
+  /** The x value ("NRTH.CX"). */
   name: string;
+  /** What to call it ("Northwind Robotics"); the same as name when the chart has no fuller one. */
+  label: string;
   value: number;
+  /** Gain since purchase, when the chart carries it. */
+  gain: number | null;
   fill: string;
 }
 
@@ -144,21 +169,29 @@ interface Slice {
 function slicesOf(chart: ChartPayload): Slice[] {
   const valueKey = seriesOf(chart)[0].key;
   const rows = chart.data
-    .map((row) => ({ name: humanize(String(row[chart.x.key])), value: Number(row[valueKey] ?? 0) }))
+    .map((row) => {
+      const name = humanize(String(row[chart.x.key]));
+      return {
+        name,
+        label: typeof row.name === "string" ? row.name : name,
+        value: Number(row[valueKey] ?? 0),
+        gain: typeof row.gain === "number" ? row.gain : null,
+      };
+    })
     .sort((a, b) => b.value - a.value);
   if (rows.length <= DONUT_SLICES) return rows.map((row, i) => ({ ...row, fill: colour(i) }));
   const kept = rows.slice(0, DONUT_SLICES - 1).map((row, i) => ({ ...row, fill: colour(i) }));
   const rest = rows.slice(DONUT_SLICES - 1).reduce((sum, row) => sum + row.value, 0);
-  return [...kept, { name: "Other", value: rest, fill: OTHER_COLOUR }];
+  return [...kept, { name: "Other", label: "Other", value: rest, gain: null, fill: OTHER_COLOUR }];
 }
 
 function DonutChart({ chart }: { chart: ChartPayload }) {
   const reveal = useReveal();
   const slices = slicesOf(chart);
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  const highlight = chart.highlight ? humanize(chart.highlight.x) : null;
   return (
-    <div className="grid grid-cols-[132px_1fr] items-center gap-5">
+    <div className="@container">
+    <div className="grid items-center gap-5 @sm:grid-cols-[132px_1fr]">
       <ResponsiveContainer width="100%" height={132}>
         <PieChart>
           <Pie
@@ -181,7 +214,8 @@ function DonutChart({ chart }: { chart: ChartPayload }) {
           <Tooltip content={<ChartTooltip chart={chart} />} />
         </PieChart>
       </ResponsiveContainer>
-      <DonutLegend slices={slices} total={total} highlight={highlight} />
+      <DonutLegend slices={slices} total={total} />
+    </div>
     </div>
   );
 }
@@ -262,8 +296,10 @@ function RowBars({ chart }: { chart: ChartPayload }) {
           {single &&
             chart.data.map((row) => {
               const dimmed = highlightX && String(row[xKey]) !== highlightX;
-              return <Cell key={String(row[xKey])} fill={colour(i)} fillOpacity={dimmed ? 0.4 : 1} />;
+              return <Cell key={String(row[xKey])} fill={colour(chart.data.indexOf(row))} fillOpacity={dimmed ? 0.45 : 1} />;
             })}
+          {!single && i === series.length - 1 &&
+            chart.data.map((row, rowIndex) => <Cell key={String(row[xKey])} fill={colour(rowIndex)} />)}
           {single && (
             <LabelList dataKey={s.key} position="right" fill="var(--muted)" fontSize={11} fontWeight={800} formatter={(v) => formatValue(chart, Number(v), true)} />
           )}

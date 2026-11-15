@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AGENT_LIMITS, type AccountId } from "../../contracts";
-import type { ChatMessage, ChatState } from "../../lib/chat";
+import { AGENT_LIMITS, type AccountId, type ActionCard } from "../../contracts";
+import type { ChatMessage, ChatState, MessagePart } from "../../lib/chat";
 import { ApprovalCard } from "../actions/approval-card";
+import { PlanCard } from "../actions/plan-card";
 import { ChartCard } from "../charts/chart-card";
 import { CheckIcon, CloseIcon, SendIcon } from "../ui/icons";
 import { Mascot, type MascotMood } from "./mascot";
@@ -19,7 +20,7 @@ const SUGGESTIONS = [
   "Pay my hydro bill",
 ];
 
-export const DISCLAIMER = "Made-up data. An AI financial agent demo.";
+export const DISCLAIMER = "Completely synthetic data.";
 
 function moodOf(chat: ChatState): MascotMood {
   if (chat.busy) return "thinking";
@@ -89,8 +90,45 @@ function WritingDots() {
   );
 }
 
+/** A plan's steps, shown and approved as one card. */
+function Plan({ cards, controls }: { cards: ActionCard[]; controls: CardControls }) {
+  const ids = cards.map((card) => card.action_id);
+  const failedId = ids.find((id) => controls.errors[id]);
+  return (
+    <PlanCard
+      cards={cards}
+      busy={controls.busyId !== null && ids.includes(controls.busyId)}
+      error={failedId ? controls.errors[failedId] : null}
+      onApprove={() => controls.each(cards, "approve")}
+      onDismiss={() => controls.each(cards, "dismiss")}
+      onUndo={() => controls.each(cards, "undo")}
+      onExecuteNow={() => controls.each(cards, "executeNow")}
+      onWindowElapsed={() => controls.each(cards, "settle")}
+    />
+  );
+}
+
 function MessageParts({ message, controls }: { message: ChatMessage; controls: CardControls }) {
-  return message.parts.map((part) =>
+  const planned = message.parts.flatMap((part) => (part.kind === "card" && part.card.origin === "plan" ? [part.card] : []));
+  const single = message.parts.filter((part) => part.kind === "chart" || part.card.origin !== "plan");
+  // Breakdowns sit side by side when the panel is wide enough for two.
+  const breakdowns = single.filter((part) => part.kind === "chart" && part.chart.kind === "donut");
+  const others = single.filter((part) => !breakdowns.includes(part));
+  return (
+    <>
+      {others.length > 0 && <SingleParts parts={others} controls={controls} />}
+      {breakdowns.length > 0 && (
+        <div className="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr))]">
+          <SingleParts parts={breakdowns} controls={controls} />
+        </div>
+      )}
+      {planned.length > 0 && <Plan cards={planned} controls={controls} />}
+    </>
+  );
+}
+
+function SingleParts({ parts, controls }: { parts: MessagePart[]; controls: CardControls }) {
+  return parts.map((part) =>
     part.kind === "chart" ? (
       <ChartCard key={part.chart.id} chart={part.chart} height={190} />
     ) : (

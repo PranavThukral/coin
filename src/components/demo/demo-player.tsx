@@ -9,7 +9,7 @@ import { DEMO_STEPS, type CardStep, type DemoStep } from "../../demo/script";
 import { latestCard } from "../coin/use-coin-chat";
 import type { CoinConversation } from "../coin/sidebar";
 
-const READ_MS = 4_500;
+const READ_MS = 10_000;
 const BEFORE_CLICK_MS = 1_600;
 const SHOW_UNDO_MS = 3_000;
 
@@ -38,7 +38,8 @@ async function clickCard(coin: CoinConversation, action: CardStep): Promise<void
 function usePlayback({ coin, viewing, setViewing }: Props) {
   const [index, setIndex] = useState(0);
   const [running, setRunning] = useState(false);
-  const [autoplay, setAutoplay] = useState(false);
+  // The demo moves on by itself; Pause hands the pace to the viewer.
+  const [autoplay, setAutoplay] = useState(true);
   const viewingRef = useRef(viewing);
   useEffect(() => {
     viewingRef.current = viewing;
@@ -134,13 +135,21 @@ export function DemoPlayer(props: Props) {
         </div>
         <div className="mt-4 flex shrink-0 flex-wrap gap-2 lg:mt-0">
           {!finished && (
-            <button type="button" className={PRIMARY} disabled={running} onClick={next}>
-              Next step
+            <button type="button" className={`relative overflow-hidden ${PRIMARY}`} disabled={running} onClick={next}>
+              {autoplay && !running && (
+                <span
+                  key={index}
+                  aria-hidden="true"
+                  className="coin-countdown absolute inset-0 bg-black/30"
+                  style={{ animationDuration: `${READ_MS}ms` }}
+                />
+              )}
+              <span className="relative">Next step</span>
             </button>
           )}
           {!finished && (
             <button type="button" className={SECONDARY} onClick={() => setAutoplay(!autoplay)}>
-              {autoplay ? "Pause" : "Play all"}
+              {autoplay ? "Pause" : "Auto-play"}
             </button>
           )}
           <button type="button" className={SECONDARY} disabled={running} onClick={restart}>

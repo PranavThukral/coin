@@ -2,34 +2,19 @@
 
 // Numbers that move. When a balance changes (an action executed, a range was
 // picked) the figure counts to its new value instead of jumping.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signedMoney } from "../../lib/format";
 
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
-
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-
-function reducedMotion(): boolean {
-  return window.matchMedia(REDUCED_MOTION).matches;
-}
-
-function watchReducedMotion(onChange: () => void): () => void {
-  const query = window.matchMedia(REDUCED_MOTION);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-/** True when the visitor asked their device for less motion. */
-export function useReducedMotion(): boolean {
-  return useSyncExternalStore(watchReducedMotion, reducedMotion, () => false);
-}
 
 /**
  * Runs `paint(progress)` on every frame from 0 to 1 over `ms`, eased.
  * Returns a function that stops it.
  */
 function animate(ms: number, paint: (progress: number) => void): () => void {
-  const duration = reducedMotion() ? 0 : ms;
+  // Counting numbers and a morphing line change in place, so they run even
+  // when the device asks for less motion (see tokens.css).
+  const duration = ms;
   const startedAt = performance.now();
   let frame = requestAnimationFrame(function step(now) {
     const t = duration === 0 ? 1 : Math.min(1, (now - startedAt) / duration);
@@ -57,7 +42,7 @@ export function useTween(target: number, ms = 700): number {
 }
 
 /** A list of numbers (same length each time) that glides to each new target. */
-export function useTweenedList(target: number[], ms = 650): number[] {
+export function useTweenedList(target: number[], ms = 900): number[] {
   const [shown, setShown] = useState(target);
   const current = useRef(target);
 
