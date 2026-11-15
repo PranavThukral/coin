@@ -121,35 +121,37 @@ export function DemoPlayer(props: Props) {
   return (
     <section
       aria-label="Scripted demo"
-      className="coin-rise fixed inset-x-0 bottom-0 z-50 h-52 overflow-y-auto rounded-t-coin-lg bg-surface-raised p-5 shadow-coin-float lg:inset-x-auto lg:bottom-6 lg:left-6 lg:h-auto lg:w-[26rem] lg:rounded-coin-lg"
+      className="coin-rise fixed inset-x-0 bottom-0 z-50 h-52 overflow-y-auto rounded-t-coin-lg bg-surface-raised p-5 shadow-coin-float lg:static lg:z-auto lg:mx-10 lg:mb-3 lg:h-auto lg:shrink-0 lg:overflow-visible lg:rounded-coin-lg lg:px-7"
     >
       <Progress index={index} running={running} />
-      {/* Keyed by step, so each new caption rises in. */}
-      <div key={step.id} className="coin-rise mt-4">
-        <h2 className="text-lg font-extrabold leading-snug tracking-tight">{step.title}</h2>
-        <p className="mt-1 text-sm font-medium leading-snug text-muted" aria-live="polite">
-          {step.proves}
-        </p>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {!finished && (
-          <button type="button" className={PRIMARY} disabled={running} onClick={next}>
-            Next step
+      <div className="mt-4 lg:flex lg:items-center lg:justify-between lg:gap-8">
+        {/* Keyed by step, so each new caption rises in. */}
+        <div key={step.id} className="coin-rise min-w-0">
+          <h2 className="text-lg font-extrabold leading-snug tracking-tight">{step.title}</h2>
+          <p className="mt-1 text-sm font-medium leading-snug text-muted" aria-live="polite">
+            {step.proves}
+          </p>
+        </div>
+        <div className="mt-4 flex shrink-0 flex-wrap gap-2 lg:mt-0">
+          {!finished && (
+            <button type="button" className={PRIMARY} disabled={running} onClick={next}>
+              Next step
+            </button>
+          )}
+          {!finished && (
+            <button type="button" className={SECONDARY} onClick={() => setAutoplay(!autoplay)}>
+              {autoplay ? "Pause" : "Play all"}
+            </button>
+          )}
+          <button type="button" className={SECONDARY} disabled={running} onClick={restart}>
+            Restart
           </button>
-        )}
-        {!finished && (
-          <button type="button" className={SECONDARY} onClick={() => setAutoplay(!autoplay)}>
-            {autoplay ? "Pause" : "Play all"}
-          </button>
-        )}
-        <button type="button" className={SECONDARY} disabled={running} onClick={restart}>
-          Restart
-        </button>
-        {finished && (
-          <a href="/app" className={PRIMARY}>
-            Try it live
-          </a>
-        )}
+          {finished && (
+            <a href="/app" className={PRIMARY}>
+              Try it live
+            </a>
+          )}
+        </div>
       </div>
     </section>
   );

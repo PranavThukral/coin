@@ -34,7 +34,7 @@ function SeeScene() {
     <div className="flex h-full flex-col justify-between">
       <div>
         <p className="money text-2xl font-extrabold tracking-tight">$349,400</p>
-        <p className="money text-xs font-extrabold text-gain">+17.8% past year</p>
+        <p className="money text-xs font-extrabold text-gain">+22.0% past year</p>
       </div>
       <div className="coin-wipe" style={beat(8)}>
         <svg viewBox="0 0 280 72" className="block w-full overflow-visible" aria-hidden="true">

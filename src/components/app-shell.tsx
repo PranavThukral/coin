@@ -170,7 +170,7 @@ function OpenCoinButton({ choice, lifted, onOpen }: { choice: boolean | null; li
       onClick={onOpen}
       aria-label="Open Coin"
       className={`coin-rise fixed right-5 z-30 grid h-16 w-16 place-items-center rounded-full bg-surface shadow-coin-float transition-transform hover:scale-105 ${
-        lifted ? "bottom-56 lg:bottom-6" : "bottom-5"
+        lifted ? "bottom-56 lg:bottom-40" : "bottom-5"
       } ${choice === null ? "lg:hidden" : ""}`}
     >
       <Mascot size={44} />
@@ -212,12 +212,16 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
 
   return (
     <div className="coin-canvas flex h-dvh overflow-hidden text-foreground">
-      <main className={`min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 lg:px-10 ${demo ? "pb-64" : "pb-24"}`}>
-        <div className="mx-auto max-w-5xl">
-          <TopBar mode={mode} />
-          <Dashboard openAccountId={viewing} onOpenAccount={setOpenAccount} refreshKey={refreshKey} />
-        </div>
-      </main>
+      {/* The dashboard scrolls; in the demo, the player is docked under it and never covers it. */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className={`min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 lg:px-10 ${demo ? "pb-60 lg:pb-10" : "pb-24"}`}>
+          <div className="mx-auto max-w-5xl">
+            <TopBar mode={mode} />
+            <Dashboard openAccountId={viewing} onOpenAccount={setOpenAccount} refreshKey={refreshKey} />
+          </div>
+        </main>
+        {demo && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} />}
+      </div>
 
       <div
         className={`${panelClass(panel.choice)} ${demo ? "max-lg:bottom-52" : ""}`}
@@ -229,7 +233,6 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
         </div>
       </div>
 
-      {demo && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} />}
       <OpenCoinButton choice={panel.choice} lifted={demo} onOpen={panel.open} />
     </div>
   );
