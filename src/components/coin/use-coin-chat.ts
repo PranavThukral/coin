@@ -17,13 +17,13 @@ import {
 export interface CardControls {
   busyId: string | null;
   errors: Record<string, string>;
-  approve(card: ActionCard): void;
-  dismiss(card: ActionCard): void;
-  undo(card: ActionCard): void;
-  executeNow(card: ActionCard): void;
-  confirmRecipient(card: ActionCard, email: string): void;
-  useInstead(card: ActionCard): void;
-  settle(card: ActionCard): void;
+  approve(card: ActionCard): Promise<void>;
+  dismiss(card: ActionCard): Promise<void>;
+  undo(card: ActionCard): Promise<void>;
+  executeNow(card: ActionCard): Promise<void>;
+  confirmRecipient(card: ActionCard, email: string): Promise<void>;
+  useInstead(card: ActionCard): Promise<void>;
+  settle(card: ActionCard): Promise<void>;
 }
 
 const SETTLE_ATTEMPTS = 10;
@@ -48,8 +48,30 @@ function actionErrorText(error: unknown): string {
   return error.message;
 }
 
+/** The newest action card in the conversation, if any. */
+export function latestCard(chat: ChatState): ActionCard | null {
+  for (let i = chat.messages.length - 1; i >= 0; i -= 1) {
+    const parts = chat.messages[i].parts;
+    for (let j = parts.length - 1; j >= 0; j -= 1) {
+      const part = parts[j];
+      if (part.kind === "card") return part.card;
+    }
+  }
+  return null;
+}
+
 export function useCoinChat(transport: ChatTransport, onActionSettled: () => void) {
-  const [chat, setChat] = useState<ChatState>(initialChat);
+  const [chat, setChatState] = useState<ChatState>(initialChat);
+  // Mirrors the latest state, so the scripted demo can read it right after an await.
+  const chatRef = useRef<ChatState>(initialChat);
+  const setChat = useCallback((update: (state: ChatState) => ChatState) => {
+    setChatState((state) => {
+      const next = update(state);
+      chatRef.current = next;
+      return next;
+    });
+  }, []);
+  const getChat = useCallback(() => chatRef.current, []);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const abort = useRef<AbortController | null>(null);
@@ -72,7 +94,7 @@ export function useCoinChat(transport: ChatTransport, onActionSettled: () => voi
       const stillCurrent = abort.current === controller;
       if (stillCurrent) setChat(endTurn);
     },
-    [transport],
+    [transport, setChat],
   );
 
   const runAction = useCallback(
@@ -93,7 +115,7 @@ export function useCoinChat(transport: ChatTransport, onActionSettled: () => voi
         setBusyId(null);
       }
     },
-    [onActionSettled],
+    [onActionSettled, setChat],
   );
 
   /**
@@ -113,7 +135,7 @@ export function useCoinChat(transport: ChatTransport, onActionSettled: () => voi
         await wait(SETTLE_RETRY_MS);
       }
     },
-    [onActionSettled],
+    [onActionSettled, setChat],
   );
 
   const controls: CardControls = {
@@ -138,5 +160,5 @@ export function useCoinChat(transport: ChatTransport, onActionSettled: () => voi
     settle,
   };
 
-  return { chat, send, controls };
+  return { chat, getChat, send, controls };
 }

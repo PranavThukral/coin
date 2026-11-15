@@ -5,9 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountId as AccountIdSchema, type AccountView } from "../contracts";
 import type { AccountId } from "../contracts";
 import { api } from "../lib/api";
-import { liveTransport, type ChatTransport } from "../lib/chat";
+import { demoTransport, liveTransport, type ChatTransport } from "../lib/chat";
 import { Mascot } from "./coin/mascot";
 import { CoinSidebar } from "./coin/sidebar";
+import { useCoinChat } from "./coin/use-coin-chat";
+import { DemoPlayer } from "./demo/demo-player";
 import { Dashboard } from "./dashboard/dashboard";
 
 const MIN_WIDTH = 340;
@@ -139,6 +141,7 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
 
   const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
   const setOpenAccount = (account: AccountView | null) => setViewing(account?.id ?? null);
+  const coin = useCoinChat(transport, refresh);
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background text-foreground">
@@ -166,13 +169,15 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
         />
         <div className="h-full w-full">
           <CoinSidebar
-            transport={transport}
+            coin={coin}
             viewingAccountId={viewing}
-            onActionSettled={refresh}
             onCollapse={() => setCollapsed(true)}
+            replayOnly={mode === "demo"}
           />
         </div>
       </div>
+
+      {mode === "demo" && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} />}
 
       {collapsed && (
         <button
@@ -190,4 +195,8 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
 
 export function LiveApp() {
   return <AppShell transport={liveTransport} mode="live" />;
+}
+
+export function DemoApp() {
+  return <AppShell transport={demoTransport} mode="demo" />;
 }
