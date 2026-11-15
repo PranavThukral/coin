@@ -96,6 +96,25 @@ function topUp(sales: Sale[], target: number): void {
   }
 }
 
+/** Whole shares overshoot the target; give back any share the plan covers the target without. */
+function trim(sales: Sale[], target: number): void {
+  const priciestFirst = [...sales].sort((a, b) => b.holding.last_price_cents - a.holding.last_price_cents);
+  for (const sale of priciestFirst) {
+    const price = sale.holding.last_price_cents;
+    const spare = Math.floor((saleValue(sales) - target) / price);
+    sale.quantity -= Math.max(0, Math.min(sale.quantity, spare));
+  }
+}
+
+/** A new plan replaces any earlier one the user hasn't approved. */
+async function dismissOpenPlans(db: Db, sessionId: string): Promise<void> {
+  await db.query(
+    `update actions set status = 'cancelled', cancelled_at = now()
+     where session_id = $1 and origin = 'plan' and status = 'proposed'`,
+    [sessionId],
+  );
+}
+
 function chooseSales(holdings: Holding[], target: number | null, method: SalePlanInput["method"]): Sale[] {
   if (target === null) {
     return holdings.map((holding) => ({ holding, quantity: holding.quantity }));
@@ -114,6 +133,7 @@ function chooseSales(holdings: Holding[], target: number | null, method: SalePla
     }));
   }
   topUp(sales, target);
+  trim(sales, target);
   return sales.filter((sale) => sale.quantity > 0);
 }
 
@@ -234,6 +254,7 @@ export async function planSale(
   const destination = input.move_proceeds_to;
   const named = destination !== null
     && messages.some((message) => extractRequestEntities(message).accounts_mentioned.includes(destination));
+  await dismissOpenPlans(db, sessionId);
   const cards = await proposeSteps(db, sessionId, messageId, sales, named ? destination : null);
   return { cards, output: planOutput(cards, sales, destination !== null, named) };
 }

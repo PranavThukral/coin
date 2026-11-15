@@ -547,7 +547,7 @@ export const ACCOUNT_ALIASES: Record<AccountId, readonly string[]> = {
 /** Phrases that mean "the whole balance/amount" for bill payments (the card
  * included). When present, the engine treats the bill's amount_cents (for
  * bill_card: the card's statement balance) as the amount the user asked for. */
-export const FULL_AMOUNT_PHRASES = ["in full", "full balance", "whole balance", "entire balance", "the balance", "all of it", "statement balance", "full amount"] as const;
+export const FULL_AMOUNT_PHRASES = ["in full", "full balance", "whole balance", "entire balance", "the balance", "all of it", "statement balance", "full amount", "pay off", "pay it off", "payoff", "clear my card", "clear the card"] as const;
 
 /* ========================================================================== */
 /* 5. ACTION PROPOSALS                                                        */
