@@ -100,7 +100,7 @@ Spending is capped by its own ledger: $0.50 a day and $5 in total, checked befor
 ## What this is not
 
 - Not connected to any bank. All data is synthetic, and every action is simulated.
-- Not tested against, compared with or modelled on any company's product.
+- Not affiliated with any bank or company.
 - Not financial advice.
 
 ## What I'd build next
