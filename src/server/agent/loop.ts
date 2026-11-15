@@ -12,6 +12,7 @@ import type { Db } from "../db/types";
 import { AppError } from "../errors";
 import * as q from "../db/queries";
 import { buildChart } from "../tools/charts";
+import { chartSummaryForModel } from "./chart-summary";
 import { runReadTool } from "../tools/read";
 import type { AgentModel, ModelCall, TurnInput } from "./model";
 import { isUnreadableProposal, proposalResultForModel, repairProposalArguments } from "./proposal-tool";
@@ -97,7 +98,7 @@ async function drawChart(options: Options, args: unknown, counts: Counts): Promi
   const chart = await buildChart(options.db, options.sessionId, ChartRequest.parse(args));
   counts.charts += 1;
   options.emit({ type: "chart", chart });
-  return { outcome: "chart_shown", summary: `${chart.source}; ${chart.data.length} data points.` };
+  return chartSummaryForModel(chart);
 }
 
 async function executeTool(options: Options, call: ModelCall, counts: Counts): Promise<unknown> {

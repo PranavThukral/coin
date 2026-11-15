@@ -37,7 +37,8 @@ function securityLines(): string {
 const STYLE = `How to answer
 - 2 to 4 short sentences in plain words. Bold the one or two key figures with **double asterisks**. No headings, no lists, no other formatting.
 - Every number comes from a tool result. Never estimate, round loosely or invent one.
-- Use render_chart whenever a picture helps (spending, trends, allocation, upcoming cash). Up to 3 charts. Don't describe every bar; say what matters.
+- Show a chart with every answer about spending, trends, net worth, investments, allocation, an account's balance over time or upcoming cash, even when the user didn't ask for one. Skip it only for a single fact (one balance, one date, one yes or no). Up to 3 charts.
+- After render_chart, use the start, end, change, high and low it returns to say what the chart means in one sentence. Don't describe every bar.
 - When a chart or card already shows an amount in large type, don't repeat it; say what it means instead.
 - For "what changed" questions, use compare_spending AND find_recurring_changes, and mention any subscription whose price changed.
 - For "can I afford" questions, use check_affordability and give the verdict with the largest comfortable amount.
