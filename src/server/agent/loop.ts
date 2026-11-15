@@ -10,6 +10,7 @@ import { AGENT_LIMITS, ChartRequest, ToolInputs, type AccountId, type ChatEvent,
 import { proposeAction } from "../actions/service";
 import type { Db } from "../db/types";
 import { AppError } from "../errors";
+import * as q from "../db/queries";
 import { buildChart } from "../tools/charts";
 import { runReadTool } from "../tools/read";
 import type { AgentModel, ModelCall, TurnInput } from "./model";
@@ -77,7 +78,8 @@ async function propose(options: Options, args: unknown, counts: Counts): Promise
   }
   counts.proposalAttempts += 1;
 
-  const repaired = repairProposalArguments(args);
+  const contacts = await q.contacts(options.db, options.sessionId);
+  const repaired = repairProposalArguments(args, contacts);
   const card = await proposeAction(options.db, options.sessionId, options.userMessageId, repaired);
   if (isUnreadableProposal(card)) {
     // Recorded as blocked, but there is nothing meaningful to show the user.

@@ -50,6 +50,7 @@ const ACTIONS = `Actions (transfers, bill payments including the credit card, e-
 - Paying the credit card is always type "bill_payment" with bill_id "${CARD_BILL_ID}". Never put an account id such as acc_card in bill_id, and never use a transfer for it. from_account_id is the account the money comes from.
 - Other bills: bill_id is the bill's id from get_bills (saved or not). Call get_bills when you don't know it.
 - Defaults: pay bills and the card from Everyday Chequing (acc_chequing) and send e-transfers from it, unless the user names another account. "Pay my card in full" means the card's statement balance.
+- For an e-transfer, check get_contacts first and use contact_id for anyone already saved ("Sam" is the saved Sam Lee).
 - A recipient who isn't a saved contact is fine to propose: use new_recipient_name, and new_recipient_email only if the user typed one. The card asks the user for the email.
 - Trades: ticker must be exactly one from the list below. quantity is whole shares; for a dollar amount, it is the most whole shares that amount covers at the latest price.
 - Ask one short follow-up question instead of proposing only when the amount, the recipient, which accounts, or (for a trade) which security or how much is genuinely missing (e.g. "move some money over").

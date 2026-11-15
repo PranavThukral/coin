@@ -5,7 +5,7 @@
  * Neither end can make an action pass. Every proposal still goes through
  * normalizeProposal and all nine rules, which read the user's stored message.
  */
-import { CARD_BILL_ID, type ActionCard } from "../../contracts";
+import { CARD_BILL_ID, type ActionCard, type Contact } from "../../contracts";
 import { money } from "../../lib/format";
 
 const CARD_ACCOUNT_ID = "acc_card";
@@ -16,12 +16,30 @@ function canonicalTicker(ticker: string): string {
   return SHORT_TICKER.test(upper) ? `${upper}.CX` : upper;
 }
 
+const nameWords = (name: string) => name.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
 /**
- * Fixes two slips that have only one possible meaning: the credit card's
- * account id used where its bill id belongs, and a ticker typed in lower case
- * or without the ".CX" suffix. Anything else is left for the rules to judge.
+ * "Send Sam $40": the model sometimes treats a saved contact as a new
+ * recipient. Map it back only when exactly one saved contact has that first
+ * name, every word the model wrote is in that contact's name, and no email was
+ * typed (an email means the user meant someone new).
  */
-export function repairProposalArguments(raw: unknown): unknown {
+function savedContactFor(name: string, contacts: Contact[]): string | null {
+  const typed = nameWords(name);
+  if (typed.length === 0) return null;
+  const matches = contacts.filter((contact) => contact.saved && nameWords(contact.name)[0] === typed[0]);
+  if (matches.length !== 1) return null;
+  const known = nameWords(matches[0].name);
+  return typed.every((word) => known.includes(word)) ? matches[0].id : null;
+}
+
+/**
+ * Fixes slips that have only one possible meaning: the credit card's account
+ * id used where its bill id belongs, a ticker typed in lower case or without
+ * the ".CX" suffix, and a saved contact proposed as a new recipient. Anything
+ * else is left for the rules to judge.
+ */
+export function repairProposalArguments(raw: unknown, contacts: Contact[] = []): unknown {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return raw;
   }
@@ -31,6 +49,14 @@ export function repairProposalArguments(raw: unknown): unknown {
   }
   if (proposal.type === "trade" && typeof proposal.ticker === "string") {
     proposal.ticker = canonicalTicker(proposal.ticker);
+  }
+  const newRecipient = proposal.type === "etransfer" && !proposal.contact_id && !proposal.new_recipient_email;
+  if (newRecipient && typeof proposal.new_recipient_name === "string") {
+    const contactId = savedContactFor(proposal.new_recipient_name, contacts);
+    if (contactId) {
+      proposal.contact_id = contactId;
+      proposal.new_recipient_name = null;
+    }
   }
   return proposal;
 }
