@@ -14,6 +14,8 @@ export interface ChatMessage {
   id: string;
   role: "user" | "coin";
   text: string;
+  /** What Coin did to answer, in order ("Reading your transactions..."). */
+  steps: string[];
   parts: MessagePart[];
   error: string | null;
   done: boolean;
@@ -32,8 +34,8 @@ let localId = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now()}-${++localId}`;
 
 export function addUserMessage(state: ChatState, text: string): ChatState {
-  const user: ChatMessage = { id: nextId("u"), role: "user", text, parts: [], error: null, done: true };
-  const coin: ChatMessage = { id: nextId("c"), role: "coin", text: "", parts: [], error: null, done: false };
+  const user: ChatMessage = { id: nextId("u"), role: "user", text, steps: [], parts: [], error: null, done: true };
+  const coin: ChatMessage = { id: nextId("c"), role: "coin", text: "", steps: [], parts: [], error: null, done: false };
   return { messages: [...state.messages, user, coin], status: "Thinking\u2026", busy: true };
 }
 
@@ -48,13 +50,18 @@ function updateLastCoin(state: ChatState, update: (message: ChatMessage) => Chat
   return { ...state, messages };
 }
 
+/** The same status twice in a row is one step. */
+function addStep(steps: string[], label: string): string[] {
+  return steps.at(-1) === label ? steps : [...steps, label];
+}
+
 /** Fold one server event into the conversation. Pure, so it is easy to test. */
 export function applyEvent(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
     case "message_start":
       return state;
     case "tool_status":
-      return { ...state, status: event.label };
+      return updateLastCoin({ ...state, status: event.label }, (m) => ({ ...m, steps: addStep(m.steps, event.label) }));
     case "text_delta":
       return updateLastCoin({ ...state, status: null }, (m) => ({ ...m, text: m.text + event.text }));
     case "chart":
@@ -82,11 +89,12 @@ export function endTurn(state: ChatState): ChatState {
 
 /** "Use $X instead": the server's request text, then Coin's new card. */
 export function addRetry(state: ChatState, text: string, card: ActionCard): ChatState {
-  const user: ChatMessage = { id: nextId("u"), role: "user", text, parts: [], error: null, done: true };
+  const user: ChatMessage = { id: nextId("u"), role: "user", text, steps: [], parts: [], error: null, done: true };
   const coin: ChatMessage = {
     id: nextId("c"),
     role: "coin",
     text: "Here it is at the largest amount that passes the checks.",
+    steps: [],
     parts: [{ kind: "card", card }],
     error: null,
     done: true,

@@ -9,6 +9,7 @@ import type {
   OverviewPayload,
   Transaction,
 } from "../contracts";
+import type { NetWorthRange, NetWorthSeries } from "./net-worth";
 
 /** Read tools wrap free text from the ledger; the UI shows it as plain text. */
 export type Wrapped<T> = { untrusted_data_note: string; data: T };
@@ -67,6 +68,7 @@ export const api = {
   /** Establishes the session cookie; call once before parallel requests. */
   session: () => request<{ today: string; expires_at: string }>("/api/session"),
   dashboard: () => request<DashboardPayload>("/api/dashboard"),
+  netWorth: (range: NetWorthRange) => request<NetWorthSeries>(`/api/net-worth?range=${range}`),
   account: (id: string) => request<AccountDetailPayload>(`/api/accounts/${id}`),
   overview: (accountId: string | null) =>
     request<OverviewPayload>(accountId ? `/api/overview?account_id=${accountId}` : "/api/overview"),

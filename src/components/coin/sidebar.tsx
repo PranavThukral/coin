@@ -5,6 +5,7 @@ import { AGENT_LIMITS, type AccountId } from "../../contracts";
 import type { ChatMessage, ChatState } from "../../lib/chat";
 import { ApprovalCard } from "../actions/approval-card";
 import { ChartCard } from "../charts/chart-card";
+import { CheckIcon, CloseIcon, SendIcon } from "../ui/icons";
 import { Mascot, type MascotMood } from "./mascot";
 import { OverviewPanel } from "./overview-panel";
 import type { CardControls, useCoinChat } from "./use-coin-chat";
@@ -16,6 +17,8 @@ const SUGGESTIONS = [
   "Move $2,000 from savings to chequing",
 ];
 
+export const DISCLAIMER = "Made-up data. An AI financial agent demo.";
+
 function moodOf(chat: ChatState): MascotMood {
   if (chat.busy) return "thinking";
   const last = chat.messages.at(-1);
@@ -24,6 +27,8 @@ function moodOf(chat: ChatState): MascotMood {
   if (lastCard?.kind === "card" && lastCard.card.status === "executed") return "happy";
   return "idle";
 }
+
+const stagger = (index: number) => ({ "--i": index }) as React.CSSProperties;
 
 /** Coin may bold key figures with **double asterisks**; nothing else is formatted. */
 function withBold(paragraph: string): React.ReactNode[] {
@@ -40,7 +45,7 @@ function withBold(paragraph: string): React.ReactNode[] {
 
 function CoinText({ text }: { text: string }) {
   return (
-    <div className="space-y-2 text-sm font-medium leading-6">
+    <div className="coin-rise space-y-2 text-[15px] font-medium leading-relaxed">
       {text.split(/\n{2,}/).map((paragraph, i) => (
         <p key={i}>{withBold(paragraph)}</p>
       ))}
@@ -48,45 +53,79 @@ function CoinText({ text }: { text: string }) {
   );
 }
 
+/** What Coin did to answer, one line per step, each ticking off as the next begins. */
+function StepTrail({ steps, working }: { steps: string[]; working: boolean }) {
+  if (steps.length === 0) return null;
+  return (
+    <ol className="space-y-1.5">
+      {steps.map((step, index) => {
+        const active = working && index === steps.length - 1;
+        return (
+          <li key={`${index}-${step}`} className="coin-rise flex items-center gap-2 text-xs font-bold text-subtle">
+            <span
+              className={`grid h-4 w-4 shrink-0 place-items-center rounded-full ${
+                active ? "bg-accent-soft text-accent-text" : "bg-surface-soft text-muted"
+              }`}
+            >
+              {active ? <span className="coin-dot h-1.5 w-1.5 rounded-full bg-accent" /> : <CheckIcon className="h-2.5 w-2.5" />}
+            </span>
+            <span className={active ? "text-accent-text" : ""}>{step.replace(/(…|\.\.\.)$/, "")}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function WritingDots() {
+  return (
+    <div className="flex h-6 items-center gap-1" aria-label="Coin is writing">
+      {[0, 1, 2].map((dot) => (
+        <span key={dot} className="coin-dot h-1.5 w-1.5 rounded-full bg-subtle" style={stagger(dot)} />
+      ))}
+    </div>
+  );
+}
+
+function MessageParts({ message, controls }: { message: ChatMessage; controls: CardControls }) {
+  return message.parts.map((part) =>
+    part.kind === "chart" ? (
+      <ChartCard key={part.chart.id} chart={part.chart} height={190} />
+    ) : (
+      <ApprovalCard
+        key={part.card.action_id}
+        card={part.card}
+        busy={controls.busyId === part.card.action_id}
+        error={controls.errors[part.card.action_id] ?? null}
+        onApprove={() => controls.approve(part.card)}
+        onDismiss={() => controls.dismiss(part.card)}
+        onUndo={() => controls.undo(part.card)}
+        onExecuteNow={() => controls.executeNow(part.card)}
+        onConfirmRecipient={(email) => controls.confirmRecipient(part.card, email)}
+        onUseInstead={() => controls.useInstead(part.card)}
+        onWindowElapsed={() => controls.settle(part.card)}
+      />
+    ),
+  );
+}
+
 function Message({ message, controls }: { message: ChatMessage; controls: CardControls }) {
   if (message.role === "user") {
     return (
-      <p className="ml-auto w-fit max-w-[85%] rounded-coin bg-surface-ink px-4 py-2.5 text-sm font-semibold text-on-ink">
+      <p className="coin-rise ml-auto w-fit max-w-[85%] rounded-[22px] rounded-br-md bg-surface-ink px-4 py-2.5 text-[15px] font-semibold text-on-ink">
         {message.text}
       </p>
     );
   }
 
-  const empty = !message.text && message.parts.length === 0 && !message.error;
+  const silent = !message.text && message.parts.length === 0 && !message.error;
   return (
-    <div className="flex gap-3">
-      <div className="pt-0.5">
-        <Mascot size={26} />
-      </div>
-      <div className="min-w-0 flex-1 space-y-3">
-        {empty && <div className="h-4 w-24 animate-pulse rounded bg-surface-soft" aria-label="Coin is writing" />}
-        {message.text && <CoinText text={message.text} />}
-        {message.parts.map((part) =>
-          part.kind === "chart" ? (
-            <ChartCard key={part.chart.id} chart={part.chart} height={180} />
-          ) : (
-            <ApprovalCard
-              key={part.card.action_id}
-              card={part.card}
-              busy={controls.busyId === part.card.action_id}
-              error={controls.errors[part.card.action_id] ?? null}
-              onApprove={() => controls.approve(part.card)}
-              onDismiss={() => controls.dismiss(part.card)}
-              onUndo={() => controls.undo(part.card)}
-              onExecuteNow={() => controls.executeNow(part.card)}
-              onConfirmRecipient={(email) => controls.confirmRecipient(part.card, email)}
-              onUseInstead={() => controls.useInstead(part.card)}
-              onWindowElapsed={() => controls.settle(part.card)}
-            />
-          ),
-        )}
-        {message.error && <p className="text-sm font-bold text-loss">{message.error}</p>}
-      </div>
+    <div className="space-y-3.5">
+      <StepTrail steps={message.steps} working={!message.done} />
+      {silent && message.steps.length === 0 && <WritingDots />}
+      {message.text && <CoinText text={message.text} />}
+      <MessageParts message={message} controls={controls} />
+      {message.error && <p className="coin-rise text-sm font-bold text-loss">{message.error}</p>}
     </div>
   );
 }
@@ -100,13 +139,13 @@ function Composer({ disabled, onSend }: { disabled: boolean; onSend: (text: stri
   };
   return (
     <form
-      className="border-t border-border p-3"
+      className="px-4 pb-3 pt-2"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
       }}
     >
-      <div className="flex items-end gap-2 rounded-coin border border-border-strong bg-surface px-3 py-2 focus-within:border-accent">
+      <div className="flex items-end gap-2 rounded-[26px] bg-surface-soft py-2 pl-5 pr-2 transition-shadow focus-within:shadow-[0_0_0_2px_var(--accent)]">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value.slice(0, AGENT_LIMITS.max_input_chars))}
@@ -119,20 +158,59 @@ function Composer({ disabled, onSend }: { disabled: boolean; onSend: (text: stri
           rows={1}
           placeholder="Ask Coin about your money"
           aria-label="Message Coin"
-          className="max-h-32 min-h-6 flex-1 resize-none bg-transparent text-sm font-medium outline-none placeholder:text-subtle"
+          className="max-h-32 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-[15px] font-medium outline-none placeholder:text-subtle"
         />
         <button
           type="submit"
+          aria-label="Send"
           disabled={disabled || !draft.trim()}
-          className="rounded-full bg-accent px-4 py-1.5 text-sm font-extrabold text-accent-ink disabled:opacity-40"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition-transform active:scale-90 disabled:bg-border-strong disabled:text-surface"
         >
-          Send
+          <SendIcon className="h-4 w-4" />
         </button>
       </div>
-      <p className="mt-1.5 text-[11px] font-semibold text-subtle">
-        Made-up data. Every action is simulated. Not financial advice.
-      </p>
+      <p className="mt-2 text-center text-[11px] font-semibold text-subtle">{DISCLAIMER}</p>
     </form>
+  );
+}
+
+function Suggestions({ onPick }: { onPick: (text: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {SUGGESTIONS.map((text, index) => (
+        <button
+          key={text}
+          type="button"
+          onClick={() => onPick(text)}
+          style={stagger(index + 5)}
+          className="coin-rise rounded-full bg-accent-soft px-3.5 py-2 text-left text-[13px] font-bold text-accent-text transition-transform hover:-translate-y-0.5"
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Header({ chat, onCollapse }: { chat: ChatState; onCollapse: () => void }) {
+  return (
+    <header className="flex items-center gap-3 border-b border-border px-5 py-3.5">
+      <Mascot size={36} mood={moodOf(chat)} />
+      <div className="min-w-0 flex-1">
+        <p className="text-lg font-extrabold leading-tight tracking-tight">Coin</p>
+        <p className="truncate text-xs font-bold text-accent-text empty:hidden" aria-live="polite">
+          {chat.status}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onCollapse}
+        aria-label="Hide Coin"
+        className="grid h-9 w-9 place-items-center rounded-full bg-surface-soft text-muted transition-colors hover:text-foreground"
+      >
+        <CloseIcon className="h-4 w-4" />
+      </button>
+    </header>
   );
 }
 
@@ -159,50 +237,22 @@ export function CoinSidebar({
   }, [chat.messages]);
 
   return (
-    <aside className="flex h-full flex-col bg-surface" aria-label="Coin">
-      <header className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <Mascot size={34} mood={moodOf(chat)} />
-        <div className="min-w-0 flex-1">
-          <p className="font-extrabold leading-tight">Coin</p>
-          <p className="truncate text-xs font-bold text-pending" aria-live="polite">
-            {chat.status ?? "\u00a0"}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onCollapse}
-          className="rounded-full border border-border-strong px-3 py-1 text-xs font-bold text-muted hover:text-foreground"
-        >
-          Hide
-        </button>
-      </header>
+    <aside className="flex h-full flex-col overflow-hidden bg-surface lg:rounded-coin-lg lg:shadow-coin-float" aria-label="Coin">
+      <Header chat={chat} onCollapse={onCollapse} />
 
-      <div ref={scroller} className="flex-1 space-y-5 overflow-y-auto p-4">
+      <div ref={scroller} className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
         <OverviewPanel key={viewingAccountId ?? "all"} accountId={viewingAccountId} />
-        {chat.messages.length === 0 && !replayOnly && (
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTIONS.map((text) => (
-              <button
-                key={text}
-                type="button"
-                onClick={() => send(text, viewingAccountId)}
-                className="rounded-full border border-border-strong px-3 py-1.5 text-left text-xs font-bold text-muted hover:border-accent hover:text-foreground"
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-        )}
+        {chat.messages.length === 0 && !replayOnly && <Suggestions onPick={(text) => send(text, viewingAccountId)} />}
         {chat.messages.map((message) => (
           <Message key={message.id} message={message} controls={controls} />
         ))}
       </div>
 
       {replayOnly ? (
-        <p className="border-t border-border p-4 text-sm font-semibold text-muted">
+        <p className="border-t border-border px-5 py-4 text-sm font-semibold text-muted">
           This is a replay with the real rules and your own copy of the data.{" "}
-          <a href="/app" className="font-extrabold text-accent hover:underline">
-            Try live mode
+          <a href="/app" className="font-extrabold text-accent-text hover:underline">
+            Try it live
           </a>{" "}
           to ask Coin anything.
         </p>

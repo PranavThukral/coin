@@ -96,45 +96,57 @@ async function restart(): Promise<void> {
   window.location.reload();
 }
 
+/** One segment per step; finished steps are filled, the running one pulses. */
+function Progress({ index, running }: { index: number; running: boolean }) {
+  return (
+    <ol className="flex gap-1" aria-label={`Step ${index + 1} of ${DEMO_STEPS.length}`}>
+      {DEMO_STEPS.map((step, i) => {
+        const tone = i <= index ? "bg-accent" : "bg-border";
+        const pulsing = running && i === index ? "animate-pulse" : "";
+        return <li key={step.id} className={`h-1 flex-1 rounded-full transition-colors duration-500 ${tone} ${pulsing}`} />;
+      })}
+    </ol>
+  );
+}
+
+const BUTTON = "rounded-full px-4 py-2 text-sm font-extrabold transition-transform active:scale-[0.97] disabled:opacity-40";
+const PRIMARY = `${BUTTON} bg-accent text-accent-ink shadow-coin-accent`;
+const SECONDARY = `${BUTTON} bg-surface-soft text-foreground`;
+
 export function DemoPlayer(props: Props) {
   const { index, running, autoplay, setAutoplay, next } = usePlayback(props);
   const step = DEMO_STEPS[index];
   const finished = index >= DEMO_STEPS.length - 1 && !running;
-  const button = "rounded-full px-4 py-2 text-sm font-extrabold disabled:opacity-40";
 
   return (
     <section
       aria-label="Scripted demo"
-      className="fixed bottom-6 left-6 z-30 w-[min(28rem,calc(100vw-3rem))] rounded-coin-lg bg-surface-ink p-5 text-on-ink shadow-coin ring-1 ring-gold/25"
+      className="coin-rise fixed inset-x-0 bottom-0 z-50 h-52 overflow-y-auto rounded-t-coin-lg bg-surface-raised p-5 shadow-coin-float lg:inset-x-auto lg:bottom-6 lg:left-6 lg:h-auto lg:w-[26rem] lg:rounded-coin-lg"
     >
-      <p className="text-xs font-bold text-on-ink-muted">
-        Step {index + 1} of {DEMO_STEPS.length}
-        {running && " · running"}
-      </p>
-      <h2 className="mt-1 text-lg font-extrabold leading-snug">{step.title}</h2>
-      <p className="mt-1 text-sm font-medium text-on-ink-muted" aria-live="polite">
-        {step.proves}
-      </p>
+      <Progress index={index} running={running} />
+      {/* Keyed by step, so each new caption rises in. */}
+      <div key={step.id} className="coin-rise mt-4">
+        <h2 className="text-lg font-extrabold leading-snug tracking-tight">{step.title}</h2>
+        <p className="mt-1 text-sm font-medium leading-snug text-muted" aria-live="polite">
+          {step.proves}
+        </p>
+      </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {!finished && (
-          <button type="button" className={`${button} bg-accent text-accent-ink`} disabled={running} onClick={next}>
+          <button type="button" className={PRIMARY} disabled={running} onClick={next}>
             Next step
           </button>
         )}
         {!finished && (
-          <button
-            type="button"
-            className={`${button} border border-white/25`}
-            onClick={() => setAutoplay(!autoplay)}
-          >
+          <button type="button" className={SECONDARY} onClick={() => setAutoplay(!autoplay)}>
             {autoplay ? "Pause" : "Play all"}
           </button>
         )}
-        <button type="button" className={`${button} border border-white/25`} disabled={running} onClick={restart}>
+        <button type="button" className={SECONDARY} disabled={running} onClick={restart}>
           Restart
         </button>
         {finished && (
-          <a href="/app" className={`${button} bg-accent text-accent-ink`}>
+          <a href="/app" className={PRIMARY}>
             Try it live
           </a>
         )}

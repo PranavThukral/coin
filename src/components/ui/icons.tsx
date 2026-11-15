@@ -68,3 +68,67 @@ export function ArrowIcon(props: IconProps) {
     </Svg>
   );
 }
+
+export function ChevronIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 3.5L10.5 8 6 12.5" />
+    </Svg>
+  );
+}
+
+export function BackIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M13 8H3M6.5 4.5L3 8l3.5 3.5" />
+    </Svg>
+  );
+}
+
+export function SendIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 13V3M3.5 7.5L8 3l4.5 4.5" />
+    </Svg>
+  );
+}
+
+export function CloseIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </Svg>
+  );
+}
+
+const GLYPH = "h-[18px] w-[18px]";
+
+/** Cash accounts: a banknote. */
+export function CashGlyph() {
+  return (
+    <Svg className={GLYPH}>
+      <rect x="1.75" y="4" width="12.5" height="8" rx="1.75" />
+      <circle cx="8" cy="8" r="1.75" />
+    </Svg>
+  );
+}
+
+/** Investment accounts: a rising line. */
+export function TrendGlyph() {
+  return (
+    <Svg className={GLYPH}>
+      <path d="M2 11.5l3.75-4 2.75 2.5L14 4.5" />
+      <path d="M10.5 4.5H14V8" />
+    </Svg>
+  );
+}
+
+/** Credit: a card. */
+export function CardGlyph() {
+  return (
+    <Svg className={GLYPH}>
+      <rect x="1.75" y="3.5" width="12.5" height="9" rx="1.75" />
+      <path d="M1.75 6.75h12.5" />
+    </Svg>
+  );
+}

@@ -1,55 +1,66 @@
+"use client";
+
 // Small dashboard building blocks. Pure presentation; data comes in as props.
+// Lists reveal row by row, and a figure that changes counts to its new value.
 import type { AccountView, Transaction } from "../../contracts";
 import type { UpcomingEvent } from "../../lib/api";
 import { money, relativeDay, shortDate, signedMoney } from "../../lib/format";
-import { Mascot } from "../coin/mascot";
+import { CardGlyph, CashGlyph, ChevronIcon, TrendGlyph } from "../ui/icons";
+import { AnimatedMoney, useChanged } from "../ui/motion";
 
-export function HeroStat({ label, cents }: { label: string; cents: number }) {
-  return (
-    <div>
-      <p className="text-xs font-bold text-on-ink-muted">{label}</p>
-      <p className="money mt-1 text-lg font-extrabold">{signedMoney(cents)}</p>
-    </div>
-  );
+/** `--i` staggers a row's reveal behind the rows before it. */
+export function stagger(index: number): React.CSSProperties {
+  return { "--i": index } as React.CSSProperties;
 }
 
-export function BalanceHero({ accounts, monthChange }: { accounts: AccountView[]; monthChange: number | null }) {
+export function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h3 className="mb-3 px-1 text-lg font-extrabold tracking-tight">{children}</h3>;
+}
+
+const CARD = "rounded-coin bg-surface shadow-coin";
+
+export interface Totals {
+  cash: number;
+  investments: number;
+  card: number;
+  netWorth: number;
+}
+
+export function totalsOf(accounts: AccountView[]): Totals {
   const sum = (types: string[]) =>
     accounts.filter((a) => types.includes(a.type)).reduce((total, a) => total + a.total_value_cents, 0);
   const cash = sum(["chequing", "hisa"]);
   const investments = sum(["tfsa", "rrsp", "non_registered"]);
   const card = sum(["credit_card"]);
-  const netWorth = cash + investments + card;
+  return { cash, investments, card, netWorth: cash + investments + card };
+}
 
+function HeroStat({ label, cents }: { label: string; cents: number }) {
   return (
-    <section className="relative overflow-hidden rounded-coin-lg bg-surface-ink p-7 text-on-ink shadow-coin ring-1 ring-gold/25">
-      <p className="text-sm font-bold text-on-ink-muted">Net worth</p>
-      <p className="money mt-1 text-5xl font-extrabold tracking-tight">{money(netWorth)}</p>
-      {monthChange !== null && (
-        <p
-          className={`money mt-3 inline-flex rounded-full px-3 py-1 text-sm font-extrabold ${
-            monthChange >= 0 ? "bg-accent text-accent-ink" : "bg-loss text-white"
-          }`}
-        >
-          {signedMoney(monthChange, true)} this month
-        </p>
-      )}
-      <div className="mt-7 grid grid-cols-3 gap-4 border-t border-white/15 pt-5">
-        <HeroStat label="Cash" cents={cash} />
-        <HeroStat label="Investments" cents={investments} />
-        <HeroStat label="Card owing" cents={card} />
-      </div>
-      <div className="absolute right-6 top-6">
-        <Mascot size={56} />
-      </div>
-    </section>
+    <div className="min-w-0">
+      <p className="text-xs font-bold text-subtle">{label}</p>
+      <p className="mt-1 truncate text-sm font-extrabold sm:text-lg">
+        <AnimatedMoney cents={cents} />
+      </p>
+    </div>
   );
 }
 
-const GROUPS: { title: string; types: string[] }[] = [
-  { title: "Cash", types: ["chequing", "hisa"] },
-  { title: "Investments", types: ["tfsa", "rrsp", "non_registered"] },
-  { title: "Credit", types: ["credit_card"] },
+/** What the net worth is made of, under the hero chart. */
+export function HeroStats({ totals }: { totals: Totals }) {
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      <HeroStat label="Cash" cents={totals.cash} />
+      <HeroStat label="Investments" cents={totals.investments} />
+      <HeroStat label="Card owing" cents={totals.card} />
+    </div>
+  );
+}
+
+const GROUPS: { title: string; types: string[]; glyph: React.ReactNode }[] = [
+  { title: "Cash", types: ["chequing", "hisa"], glyph: <CashGlyph /> },
+  { title: "Investments", types: ["tfsa", "rrsp", "non_registered"], glyph: <TrendGlyph /> },
+  { title: "Credit", types: ["credit_card"], glyph: <CardGlyph /> },
 ];
 
 function accountSubtitle(account: AccountView, today: string): string {
@@ -60,85 +71,129 @@ function accountSubtitle(account: AccountView, today: string): string {
   return `Ends ${account.mask}`;
 }
 
-export function AccountList({
-  accounts,
-  today,
-  onOpen,
-}: {
+function AccountRow({ account, today, glyph, index, onOpen }: {
+  account: AccountView;
+  today: string;
+  glyph: React.ReactNode;
+  index: number;
+  onOpen: (account: AccountView) => void;
+}) {
+  const changed = useChanged(account.total_value_cents);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(account)}
+      style={stagger(index)}
+      className={`coin-rise group flex w-full items-center gap-3.5 rounded-coin-sm px-3 py-3 text-left transition-colors hover:bg-surface-soft ${
+        changed ? "coin-flash" : ""
+      }`}
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-soft text-muted transition-colors group-hover:bg-accent-soft group-hover:text-accent-text">
+        {glyph}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-extrabold">{account.name}</span>
+        <span className="block truncate text-sm font-semibold text-subtle">{accountSubtitle(account, today)}</span>
+      </span>
+      <AnimatedMoney
+        cents={account.total_value_cents}
+        className={`shrink-0 text-base font-extrabold sm:text-lg ${account.total_value_cents < 0 ? "text-loss" : ""}`}
+      />
+      <ChevronIcon className="h-4 w-4 shrink-0 text-border-strong transition-transform group-hover:translate-x-0.5 group-hover:text-muted" />
+    </button>
+  );
+}
+
+export function AccountList({ accounts, today, onOpen }: {
   accounts: AccountView[];
   today: string;
   onOpen: (account: AccountView) => void;
 }) {
   return (
-    <section className="space-y-5">
-      {GROUPS.map((group) => (
-        <div key={group.title}>
-          <h3 className="mb-2 text-sm font-extrabold text-muted">{group.title}</h3>
-          <div className="divide-y divide-border rounded-coin border border-border bg-surface px-5 shadow-coin">
+    <section>
+      <SectionTitle>Accounts</SectionTitle>
+      <div className={`${CARD} space-y-4 p-3`}>
+        {GROUPS.map((group) => (
+          <div key={group.title}>
+            <p className="px-3 pb-1 pt-2 text-xs font-extrabold text-subtle">{group.title}</p>
             {accounts
               .filter((a) => group.types.includes(a.type))
               .map((account) => (
-                <button
+                <AccountRow
                   key={account.id}
-                  type="button"
-                  onClick={() => onOpen(account)}
-                  className="flex w-full items-center justify-between gap-4 py-4 text-left focus-visible:outline-2 focus-visible:outline-accent"
-                >
-                  <span>
-                    <span className="block font-extrabold">{account.name}</span>
-                    <span className="block text-sm font-semibold text-subtle">{accountSubtitle(account, today)}</span>
-                  </span>
-                  <span className={`money text-lg font-extrabold ${account.total_value_cents < 0 ? "text-loss" : ""}`}>
-                    {signedMoney(account.total_value_cents)}
-                  </span>
-                </button>
+                  account={account}
+                  today={today}
+                  glyph={group.glyph}
+                  index={accounts.indexOf(account)}
+                  onOpen={onOpen}
+                />
               ))}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </section>
   );
 }
 
-export function UpcomingStrip({ events, today }: { events: UpcomingEvent[]; today: string }) {
+function DateTile({ date }: { date: string }) {
+  const [month, day] = shortDate(date).split(" ");
+  return (
+    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-coin-sm bg-surface-soft text-center leading-none">
+      <span>
+        <span className="block text-[10px] font-extrabold text-subtle">{month}</span>
+        <span className="money mt-0.5 block text-base font-extrabold">{day}</span>
+      </span>
+    </span>
+  );
+}
+
+const LOW_BALANCE_CENTS = 50_000;
+
+export function UpcomingList({ events, today }: { events: UpcomingEvent[]; today: string }) {
   if (events.length === 0) return null;
   return (
     <section>
-      <h3 className="mb-2 text-sm font-extrabold text-muted">Next 14 days</h3>
-      <div className="flex gap-3 overflow-x-auto pb-1">
-        {events.map((event) => {
-          const low = event.projected_balance_cents < 50_000;
+      <SectionTitle>Next 14 days</SectionTitle>
+      <ul className={`${CARD} px-5 py-2`}>
+        {events.map((event, index) => {
+          const low = event.projected_balance_cents < LOW_BALANCE_CENTS;
           return (
-            <div
-              key={`${event.date}-${event.label}`}
-              className={`min-w-44 rounded-coin border bg-surface p-4 shadow-coin ${low ? "border-warning" : "border-border"}`}
-            >
-              <p className="text-xs font-bold text-subtle">
-                {shortDate(event.date)}, {relativeDay(event.date, today)}
-              </p>
-              <p className="mt-1 truncate text-sm font-extrabold">{event.label}</p>
-              <p className={`money mt-1 text-base font-extrabold ${event.amount_cents > 0 ? "text-gain" : ""}`}>
+            <li key={`${event.date}-${event.label}`} style={stagger(index)} className="coin-rise flex items-center gap-3.5 py-3">
+              <DateTile date={event.date} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-extrabold">{event.label}</span>
+                <span className={`money block truncate text-xs font-semibold ${low ? "text-warning" : "text-subtle"}`}>
+                  {relativeDay(event.date, today)}, chequing after {signedMoney(event.projected_balance_cents)}
+                </span>
+              </span>
+              <span className={`money shrink-0 text-sm font-extrabold ${event.amount_cents > 0 ? "text-gain" : ""}`}>
                 {signedMoney(event.amount_cents, true)}
-              </p>
-              <p className={`money mt-1 text-xs font-semibold ${low ? "text-warning" : "text-muted"}`}>
-                Chequing after: {signedMoney(event.projected_balance_cents)}
-              </p>
-            </div>
+              </span>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </section>
+  );
+}
+
+function MerchantBadge({ name }: { name: string }) {
+  return (
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-surface-soft text-sm font-extrabold text-muted" aria-hidden="true">
+      {name.trim().charAt(0).toUpperCase()}
+    </span>
   );
 }
 
 export function TransactionList({ transactions, title }: { transactions: Transaction[]; title: string }) {
   return (
     <section>
-      <h3 className="mb-2 text-sm font-extrabold text-muted">{title}</h3>
-      <ul className="divide-y divide-border rounded-coin border border-border bg-surface px-5 shadow-coin">
-        {transactions.map((t) => (
-          <li key={t.id} className="flex items-center justify-between gap-4 py-3">
-            <span className="min-w-0">
+      <SectionTitle>{title}</SectionTitle>
+      <ul className={`${CARD} px-5 py-2`}>
+        {transactions.map((t, index) => (
+          <li key={t.id} style={stagger(Math.min(index, 14))} className="coin-rise flex items-center gap-3.5 py-3">
+            <MerchantBadge name={t.merchant} />
+            <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-extrabold">{t.merchant}</span>
               <span className="block truncate text-xs font-semibold text-subtle">
                 {shortDate(t.posted_on)}, {t.category.replace(/_/g, " ")}

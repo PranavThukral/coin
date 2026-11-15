@@ -61,19 +61,23 @@ function useSidebarWidth() {
 }
 
 function TopBar({ mode }: { mode: "live" | "demo" }) {
+  const tab = "rounded-full px-3.5 py-1.5 text-xs font-extrabold transition-colors";
+  const on = "bg-surface text-foreground shadow-coin";
+  const off = "text-subtle hover:text-foreground";
   return (
     <header className="flex items-center justify-between gap-4 pb-8">
       <Link href="/" className="flex items-center gap-2.5">
         <Mascot size={30} />
         <span className="text-xl font-extrabold tracking-tight">Coin</span>
       </Link>
-      <span
-        className={`rounded-full px-3 py-1 text-xs font-extrabold ${
-          mode === "live" ? "bg-accent-soft text-accent" : "bg-gold-soft text-gold-deep"
-        }`}
-      >
-        {mode === "live" ? "Live mode" : "Scripted demo"}
-      </span>
+      <nav className="flex gap-1 rounded-full bg-border/60 p-1" aria-label="Mode">
+        <Link href="/app" aria-current={mode === "live" ? "page" : undefined} className={`${tab} ${mode === "live" ? on : off}`}>
+          Live
+        </Link>
+        <Link href="/demo" aria-current={mode === "demo" ? "page" : undefined} className={`${tab} ${mode === "demo" ? on : off}`}>
+          Scripted demo
+        </Link>
+      </nav>
     </header>
   );
 }
@@ -115,7 +119,7 @@ export function AppShell({ transport, mode }: { transport: ChatTransport; mode: 
   const session = useSessionReady();
   if (session.failed) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-background p-6 text-center text-foreground">
+      <div className="coin-canvas grid min-h-dvh place-items-center p-6 text-center text-foreground">
         <div>
           <Mascot size={56} mood="concerned" />
           <p className="mt-4 text-lg font-extrabold">{session.failed}</p>
@@ -125,7 +129,7 @@ export function AppShell({ transport, mode }: { transport: ChatTransport; mode: 
   }
   if (!session.ready) {
     return (
-      <div className="grid min-h-dvh place-items-center bg-background" aria-label="Opening your accounts">
+      <div className="coin-canvas grid min-h-dvh place-items-center" aria-label="Opening your accounts">
         <Mascot size={56} mood="thinking" />
       </div>
     );
@@ -133,62 +137,100 @@ export function AppShell({ transport, mode }: { transport: ChatTransport; mode: 
   return <ReadyShell transport={transport} mode={mode} />;
 }
 
+const DESKTOP = "(min-width: 1024px)";
+
+/**
+ * Whether Coin is open. Until the visitor chooses, it follows the screen:
+ * open beside the dashboard on a wide screen, tucked behind its button on a
+ * phone. In the scripted demo it opens on a phone as soon as Coin has something to say.
+ */
+function useCoinOpen(hasMessages: boolean, mode: "live" | "demo") {
+  const [choice, setChoice] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (mode !== "demo" || !hasMessages || choice !== null) return;
+    if (window.matchMedia(DESKTOP).matches) return;
+    const frame = requestAnimationFrame(() => setChoice(true));
+    return () => cancelAnimationFrame(frame);
+  }, [mode, hasMessages, choice]);
+  return { choice, open: () => setChoice(true), close: () => setChoice(false) };
+}
+
+/** Where the Coin panel sits for each choice (null = follow the screen size). */
+function panelClass(choice: boolean | null): string {
+  const placed = "fixed inset-0 z-40 lg:relative lg:inset-auto lg:z-auto lg:shrink-0 lg:py-3 lg:pr-3";
+  if (choice === null) return `hidden lg:flex ${placed}`;
+  return choice ? `flex ${placed}` : "hidden";
+}
+
+function OpenCoinButton({ choice, lifted, onOpen }: { choice: boolean | null; lifted: boolean; onOpen: () => void }) {
+  if (choice === true) return null;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="Open Coin"
+      className={`coin-rise fixed right-5 z-30 grid h-16 w-16 place-items-center rounded-full bg-surface shadow-coin-float transition-transform hover:scale-105 ${
+        lifted ? "bottom-56 lg:bottom-6" : "bottom-5"
+      } ${choice === null ? "lg:hidden" : ""}`}
+    >
+      <Mascot size={44} />
+    </button>
+  );
+}
+
+function ResizeHandle({ sidebar }: { sidebar: ReturnType<typeof useSidebarWidth> }) {
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize Coin"
+      tabIndex={0}
+      onPointerDown={sidebar.startDrag}
+      onPointerMove={sidebar.drag}
+      onPointerUp={sidebar.endDrag}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft") sidebar.nudge(24);
+        if (event.key === "ArrowRight") sidebar.nudge(-24);
+      }}
+      className="group absolute inset-y-6 -left-3 z-10 hidden w-3 cursor-col-resize place-items-center lg:grid"
+    >
+      <span className="h-12 w-1 rounded-full bg-border-strong opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+    </div>
+  );
+}
+
 function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live" | "demo" }) {
   const [viewing, setViewing] = useDeepLinkedAccount();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [collapsed, setCollapsed] = useState(false);
   const sidebar = useSidebarWidth();
 
   const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
   const setOpenAccount = (account: AccountView | null) => setViewing(account?.id ?? null);
   const coin = useCoinChat(transport, refresh);
+  const panel = useCoinOpen(coin.chat.messages.length > 0, mode);
+  const demo = mode === "demo";
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-background text-foreground">
-      <main className="min-w-0 flex-1 overflow-y-auto px-6 py-6 md:px-10">
+    <div className="coin-canvas flex h-dvh overflow-hidden text-foreground">
+      <main className={`min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 lg:px-10 ${demo ? "pb-64" : "pb-24"}`}>
         <div className="mx-auto max-w-5xl">
           <TopBar mode={mode} />
           <Dashboard openAccountId={viewing} onOpenAccount={setOpenAccount} refreshKey={refreshKey} />
         </div>
       </main>
 
-      <div className={collapsed ? "hidden" : "relative flex shrink-0 border-l border-border"} style={{ width: sidebar.width }}>
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize Coin"
-          tabIndex={0}
-          onPointerDown={sidebar.startDrag}
-          onPointerMove={sidebar.drag}
-          onPointerUp={sidebar.endDrag}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") sidebar.nudge(24);
-            if (event.key === "ArrowRight") sidebar.nudge(-24);
-          }}
-          className="absolute inset-y-0 -left-1.5 z-10 w-3 cursor-col-resize hover:bg-accent/20 focus-visible:bg-accent/30"
-        />
-        <div className="h-full w-full">
-          <CoinSidebar
-            coin={coin}
-            viewingAccountId={viewing}
-            onCollapse={() => setCollapsed(true)}
-            replayOnly={mode === "demo"}
-          />
+      <div
+        className={`${panelClass(panel.choice)} ${demo ? "max-lg:bottom-52" : ""}`}
+        style={{ "--coin-width": `${sidebar.width}px` } as React.CSSProperties}
+      >
+        <ResizeHandle sidebar={sidebar} />
+        <div className="h-full w-full lg:w-(--coin-width)">
+          <CoinSidebar coin={coin} viewingAccountId={viewing} onCollapse={panel.close} replayOnly={demo} />
         </div>
       </div>
 
-      {mode === "demo" && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} />}
-
-      {collapsed && (
-        <button
-          type="button"
-          onClick={() => setCollapsed(false)}
-          aria-label="Open Coin"
-          className="fixed bottom-6 right-6 grid h-16 w-16 place-items-center rounded-full bg-surface-ink shadow-coin ring-4 ring-gold/30 transition-transform hover:scale-105"
-        >
-          <Mascot size={44} />
-        </button>
-      )}
+      {demo && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} />}
+      <OpenCoinButton choice={panel.choice} lifted={demo} onOpen={panel.open} />
     </div>
   );
 }

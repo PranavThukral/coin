@@ -3,6 +3,8 @@
 // Draws a server-computed ChartPayload. Every number comes from the payload;
 // this component only formats and lays out. Colours are the validated chart
 // tokens in fixed order (never cycled); text always uses text tokens.
+// Charts reveal themselves: lines draw in, bars grow, rings sweep round.
+import { useId } from "react";
 import {
   Area,
   AreaChart,
@@ -10,6 +12,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Line,
   LineChart,
   Pie,
@@ -20,12 +23,13 @@ import {
   YAxis,
 } from "recharts";
 import type { ChartPayload } from "../../contracts";
-import { compactMoney, money, shortDate } from "../../lib/format";
+import { compactMoney, money, shortDate, signedMoney } from "../../lib/format";
 
 const SERIES_COLOURS = ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5", "--chart-6"];
 const colour = (index: number) => `var(${SERIES_COLOURS[Math.min(index, SERIES_COLOURS.length - 1)]})`;
 
-const AXIS_TICK = { fill: "var(--subtle)", fontSize: 12, fontWeight: 600 };
+const AXIS_TICK = { fill: "var(--subtle)", fontSize: 11, fontWeight: 700 };
+const REVEAL = { isAnimationActive: true, animationDuration: 1100, animationEasing: "ease-out" as const };
 
 function humanize(value: string): string {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return shortDate(value);
@@ -48,15 +52,23 @@ function seriesOf(payload: ChartPayload) {
   return [{ key: "value", label: payload.title }];
 }
 
-function ChartTooltip({ payload, chart }: { payload?: Array<{ name?: string; value?: number; color?: string }>; chart: ChartPayload; label?: string }) {
+interface TooltipItem {
+  name?: string;
+  value?: number;
+  color?: string;
+}
+
+function ChartTooltip({ payload, label, chart }: { payload?: TooltipItem[]; label?: string | number; chart: ChartPayload }) {
   if (!payload || payload.length === 0) return null;
+  const single = payload.length === 1;
   return (
-    <div className="rounded-coin-sm border border-border bg-surface px-3 py-2 text-xs shadow-coin">
+    <div className="rounded-coin-sm bg-surface-raised px-3 py-2 text-xs shadow-coin-float">
+      {label !== undefined && <p className="mb-1 font-bold text-subtle">{humanize(String(label))}</p>}
       {payload.map((item) => (
         <p key={item.name} className="flex items-center gap-2 font-semibold text-foreground">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ background: item.color }} />
-          <span className="text-muted">{item.name}</span>
-          <span className="money ml-auto font-extrabold">{formatValue(chart, Number(item.value ?? 0))}</span>
+          {!single && <span className="inline-block h-2 w-2 rounded-full" style={{ background: item.color }} />}
+          {!single && <span className="text-muted">{item.name}</span>}
+          <span className="money ml-auto text-sm font-extrabold">{formatValue(chart, Number(item.value ?? 0))}</span>
         </p>
       ))}
     </div>
@@ -67,10 +79,10 @@ function Legend({ chart }: { chart: ChartPayload }) {
   const series = seriesOf(chart);
   if (series.length < 2) return null;
   return (
-    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-muted">
+    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-muted">
       {series.map((s, i) => (
         <span key={s.key} className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: colour(i) }} />
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: barColour(chart, i) }} />
           {s.label}
         </span>
       ))}
@@ -78,129 +90,281 @@ function Legend({ chart }: { chart: ChartPayload }) {
   );
 }
 
-function DonutChart({ chart }: { chart: ChartPayload }) {
-  const valueKey = seriesOf(chart)[0].key;
-  const rows = chart.data.map((row) => ({ name: humanize(String(row[chart.x.key])), value: Number(row[valueKey] ?? 0) }));
-  const total = rows.reduce((sum, row) => sum + row.value, 0);
+/** For a single line over time: where it ended and how far it moved. */
+function TrendSummary({ chart }: { chart: ChartPayload }) {
+  const dated = chart.x.type === "date" && chart.series.length <= 1 && chart.value_format === "cad";
+  const trend = chart.kind === "line" || chart.kind === "area";
+  if (!dated || !trend || chart.data.length < 2) return null;
+  const key = seriesOf(chart)[0].key;
+  const first = Number(chart.data[0][key] ?? 0);
+  const last = Number(chart.data[chart.data.length - 1][key] ?? 0);
+  const change = last - first;
+  const percent = first === 0 ? null : `${((Math.abs(change) / Math.abs(first)) * 100).toFixed(1)}%`;
   return (
-    <div className="grid grid-cols-[150px_1fr] items-center gap-4">
-      <ResponsiveContainer width="100%" height={150}>
+    <div className="mt-1 flex flex-wrap items-baseline gap-x-2.5">
+      <p className="money text-2xl font-extrabold tracking-tight">{money(last)}</p>
+      <p className={`money text-xs font-extrabold ${change >= 0 ? "text-gain" : "text-loss"}`}>
+        {signedMoney(change, true)}
+        {percent && ` (${percent})`}
+      </p>
+    </div>
+  );
+}
+
+function DonutLegend({ slices, total, highlight }: { slices: Slice[]; total: number; highlight: string | null }) {
+  return (
+    <ul className="min-w-0 space-y-1.5 text-sm">
+      {slices.map((slice, i) => (
+        <li key={slice.name} className="coin-rise flex items-center gap-2 font-semibold" style={{ "--i": i + 4 } as React.CSSProperties}>
+          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: slice.fill }} />
+          <span className={`truncate ${slice.name === highlight ? "font-extrabold text-foreground" : "text-muted"}`}>{slice.name}</span>
+          <span className="money ml-auto font-extrabold">{total ? `${Math.round((slice.value / total) * 100)}%` : ""}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const DONUT_SLICES = 6;
+const OTHER_COLOUR = "var(--border-strong)";
+
+interface Slice {
+  name: string;
+  value: number;
+  fill: string;
+}
+
+/** Largest first; past six slices the small ones fold into a grey "Other". */
+function slicesOf(chart: ChartPayload): Slice[] {
+  const valueKey = seriesOf(chart)[0].key;
+  const rows = chart.data
+    .map((row) => ({ name: humanize(String(row[chart.x.key])), value: Number(row[valueKey] ?? 0) }))
+    .sort((a, b) => b.value - a.value);
+  if (rows.length <= DONUT_SLICES) return rows.map((row, i) => ({ ...row, fill: colour(i) }));
+  const kept = rows.slice(0, DONUT_SLICES - 1).map((row, i) => ({ ...row, fill: colour(i) }));
+  const rest = rows.slice(DONUT_SLICES - 1).reduce((sum, row) => sum + row.value, 0);
+  return [...kept, { name: "Other", value: rest, fill: OTHER_COLOUR }];
+}
+
+function DonutChart({ chart }: { chart: ChartPayload }) {
+  const slices = slicesOf(chart);
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const highlight = chart.highlight ? humanize(chart.highlight.x) : null;
+  return (
+    <div className="grid grid-cols-[132px_1fr] items-center gap-5">
+      <ResponsiveContainer width="100%" height={132}>
         <PieChart>
-          <Pie data={rows} dataKey="value" nameKey="name" innerRadius={44} outerRadius={70} stroke="var(--surface)" strokeWidth={2}>
-            {rows.map((row, i) => (
-              <Cell key={row.name} fill={colour(i)} />
+          <Pie
+            data={slices}
+            dataKey="value"
+            nameKey="name"
+            innerRadius={42}
+            outerRadius={64}
+            paddingAngle={2}
+            cornerRadius={4}
+            stroke="none"
+            startAngle={90}
+            endAngle={-270}
+            {...REVEAL}
+          >
+            {slices.map((slice) => (
+              <Cell key={slice.name} fill={slice.fill} />
             ))}
           </Pie>
           <Tooltip content={<ChartTooltip chart={chart} />} />
         </PieChart>
       </ResponsiveContainer>
-      <ul className="space-y-1.5 text-sm">
-        {rows.slice(0, 6).map((row, i) => (
-          <li key={row.name} className="flex items-center gap-2 font-semibold">
-            <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colour(i) }} />
-            <span className="truncate text-muted">{row.name}</span>
-            <span className="money ml-auto font-extrabold">{total ? `${Math.round((row.value / total) * 100)}%` : ""}</span>
-          </li>
-        ))}
-      </ul>
+      <DonutLegend slices={slices} total={total} highlight={highlight} />
     </div>
   );
 }
 
-function CartesianBody({ chart }: { chart: ChartPayload }) {
-  const series = seriesOf(chart);
-  const xKey = chart.x.key;
-  // Bars and areas encode size, so they start at zero; lines show change, so they zoom.
-  const zeroBased = chart.kind === "bar" || chart.kind === "grouped_bar" || chart.kind === "area";
-  const common = {
-    data: chart.data,
-    margin: { top: 8, right: 8, bottom: 0, left: 0 },
-  };
-  const axes = (
+function Axes({ chart, zeroBased }: { chart: ChartPayload; zeroBased: boolean }) {
+  return (
     <>
-      <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="0" />
-      <XAxis dataKey={xKey} tick={AXIS_TICK} tickLine={false} axisLine={false} tickFormatter={(v) => humanize(String(v))} minTickGap={16} />
+      <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="2 5" />
+      <XAxis
+        dataKey={chart.x.key}
+        tick={AXIS_TICK}
+        tickLine={false}
+        axisLine={false}
+        tickMargin={8}
+        tickFormatter={(v) => humanize(String(v))}
+        minTickGap={20}
+      />
       <YAxis
         tick={AXIS_TICK}
         tickLine={false}
         axisLine={false}
-        width={56}
+        width={46}
+        tickCount={4}
         domain={zeroBased ? [0, "auto"] : ["auto", "auto"]}
         tickFormatter={(v) => formatValue(chart, Number(v), true)}
       />
-      <Tooltip content={<ChartTooltip chart={chart} />} cursor={{ fill: "var(--surface-soft)", stroke: "var(--border-strong)" }} labelFormatter={(v) => humanize(String(v))} />
+      <Tooltip
+        content={<ChartTooltip chart={chart} />}
+        cursor={{ fill: "var(--surface-soft)", stroke: "var(--border-strong)", strokeWidth: 1 }}
+      />
     </>
   );
+}
 
-  if (chart.kind === "bar" || chart.kind === "grouped_bar") {
-    const highlightX = chart.highlight?.x;
-    return (
-      <BarChart {...common} barGap={2} barCategoryGap="24%">
-        {axes}
-        {series.map((s, i) => (
-          <Bar key={s.key} dataKey={s.key} name={s.label} fill={colour(i)} radius={[4, 4, 0, 0]} maxBarSize={40}>
-            {series.length === 1 &&
-              chart.data.map((row) => (
-                <Cell
-                  key={String(row[xKey])}
-                  fill={colour(i)}
-                  fillOpacity={highlightX && String(row[xKey]) !== highlightX ? 0.45 : 1}
-                />
-              ))}
-          </Bar>
-        ))}
-      </BarChart>
-    );
-  }
-  if (chart.kind === "area") {
-    return (
-      <AreaChart {...common}>
-        {axes}
-        {series.map((s, i) => (
-          <Area key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={colour(i)} strokeWidth={2} fill={colour(i)} fillOpacity={0.12} dot={false} />
-        ))}
-      </AreaChart>
-    );
-  }
+const MARGIN = { top: 8, right: 8, bottom: 0, left: 0 };
+const ACTIVE_DOT = { r: 5, strokeWidth: 3, stroke: "var(--surface)" };
+
+/** In a two-series comparison the earlier period is quiet and the current one leads. */
+function barColour(chart: ChartPayload, index: number): string {
+  if (chart.kind !== "grouped_bar" || chart.series.length !== 2) return colour(index);
+  return index === 0 ? "var(--border-strong)" : colour(0);
+}
+
+/** Bars over time: upright columns. */
+function ColumnBars({ chart }: { chart: ChartPayload }) {
   return (
-    <LineChart {...common}>
-      {axes}
+    <BarChart data={chart.data} margin={MARGIN} barGap={3} barCategoryGap="26%">
+      <Axes chart={chart} zeroBased />
+      {seriesOf(chart).map((s, i) => (
+        <Bar key={s.key} dataKey={s.key} name={s.label} fill={barColour(chart, i)} radius={[5, 5, 0, 0]} maxBarSize={32} {...REVEAL} animationBegin={i * 160} />
+      ))}
+    </BarChart>
+  );
+}
+
+const ROW_HEIGHT = { single: 30, grouped: 38 };
+
+function rowBarsHeight(chart: ChartPayload): number {
+  const perRow = chart.series.length > 1 ? ROW_HEIGHT.grouped : ROW_HEIGHT.single;
+  return chart.data.length * perRow + 8;
+}
+
+/** Bars by category: one row each, so every name has room to be read. */
+function RowBars({ chart }: { chart: ChartPayload }) {
+  const series = seriesOf(chart);
+  const xKey = chart.x.key;
+  const highlightX = chart.highlight?.x;
+  const single = series.length === 1;
+  return (
+    <BarChart data={chart.data} layout="vertical" margin={{ top: 0, right: single ? 52 : 8, bottom: 0, left: 0 }} barGap={2} barCategoryGap="24%">
+      <XAxis type="number" hide domain={[0, "auto"]} />
+      <YAxis type="category" dataKey={xKey} tick={AXIS_TICK} tickLine={false} axisLine={false} width={96} tickFormatter={(v) => humanize(String(v))} />
+      <Tooltip content={<ChartTooltip chart={chart} />} cursor={{ fill: "var(--surface-soft)" }} />
       {series.map((s, i) => (
+        <Bar key={s.key} dataKey={s.key} name={s.label} fill={barColour(chart, i)} radius={[0, 5, 5, 0]} maxBarSize={14} {...REVEAL} animationBegin={i * 160}>
+          {single &&
+            chart.data.map((row) => {
+              const dimmed = highlightX && String(row[xKey]) !== highlightX;
+              return <Cell key={String(row[xKey])} fill={colour(i)} fillOpacity={dimmed ? 0.4 : 1} />;
+            })}
+          {single && (
+            <LabelList dataKey={s.key} position="right" fill="var(--muted)" fontSize={11} fontWeight={800} formatter={(v) => formatValue(chart, Number(v), true)} />
+          )}
+        </Bar>
+      ))}
+    </BarChart>
+  );
+}
+
+const isBars = (chart: ChartPayload) => chart.kind === "bar" || chart.kind === "grouped_bar";
+const isRowBars = (chart: ChartPayload) => isBars(chart) && chart.x.type === "category";
+
+/** One series over time: a line with a soft fill under it. */
+function TrendArea({ chart, zeroBased }: { chart: ChartPayload; zeroBased: boolean }) {
+  const id = useId();
+  const series = seriesOf(chart);
+  return (
+    <AreaChart data={chart.data} margin={MARGIN}>
+      <defs>
+        {series.map((s, i) => (
+          <linearGradient key={s.key} id={`${id}-${i}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={colour(i)} stopOpacity={0.22} />
+            <stop offset="1" stopColor={colour(i)} stopOpacity={0} />
+          </linearGradient>
+        ))}
+      </defs>
+      <Axes chart={chart} zeroBased={zeroBased} />
+      {series.map((s, i) => (
+        <Area
+          key={s.key}
+          type="monotone"
+          dataKey={s.key}
+          name={s.label}
+          stroke={colour(i)}
+          strokeWidth={2.5}
+          fill={`url(#${id}-${i})`}
+          dot={false}
+          activeDot={ACTIVE_DOT}
+          {...REVEAL}
+        />
+      ))}
+    </AreaChart>
+  );
+}
+
+function Lines({ chart }: { chart: ChartPayload }) {
+  return (
+    <LineChart data={chart.data} margin={MARGIN}>
+      <Axes chart={chart} zeroBased={false} />
+      {seriesOf(chart).map((s, i) => (
         <Line
           key={s.key}
           type={chart.kind === "step" ? "stepAfter" : "monotone"}
           dataKey={s.key}
           name={s.label}
           stroke={colour(i)}
-          strokeWidth={2}
+          strokeWidth={2.5}
           dot={false}
-          activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
+          activeDot={ACTIVE_DOT}
+          {...REVEAL}
         />
       ))}
     </LineChart>
   );
 }
 
-export function ChartCard({ chart, height = 200, bare = false }: { chart: ChartPayload; height?: number; bare?: boolean }) {
+function CartesianBody({ chart }: { chart: ChartPayload }) {
+  if (isRowBars(chart)) return <RowBars chart={chart} />;
+  if (isBars(chart)) return <ColumnBars chart={chart} />;
+  // Areas encode size, so they start at zero; lines show change, so they zoom.
+  if (chart.kind === "area") return <TrendArea chart={chart} zeroBased />;
+  if (chart.kind === "line" && chart.series.length <= 1) return <TrendArea chart={chart} zeroBased={false} />;
+  return <Lines chart={chart} />;
+}
+
+export function ChartCard({
+  chart,
+  height = 200,
+  bare = false,
+  hero = false,
+}: {
+  chart: ChartPayload;
+  height?: number;
+  /** No card frame (the chart sits inside another card). */
+  bare?: boolean;
+  /** The surrounding card already names and totals the chart. */
+  hero?: boolean;
+}) {
   const body =
     chart.kind === "donut" ? (
       <DonutChart chart={chart} />
     ) : (
-      <ResponsiveContainer width="100%" height={height}>
+      <ResponsiveContainer width="100%" height={isRowBars(chart) ? rowBarsHeight(chart) : height}>
         <CartesianBody chart={chart} />
       </ResponsiveContainer>
     );
 
   return (
-    <figure className={bare ? "" : "rounded-coin border border-border bg-surface p-4"}>
-      <figcaption className="mb-3">
-        <p className="text-sm font-extrabold">{chart.title}</p>
-        {chart.subtitle && <p className="text-xs font-semibold text-subtle">{chart.subtitle}</p>}
-      </figcaption>
+    <figure className={bare ? "" : "coin-rise rounded-coin bg-surface-raised p-4 shadow-coin"}>
+      {!hero && (
+        <figcaption className="mb-3">
+          <p className="text-sm font-extrabold">{chart.title}</p>
+          {chart.subtitle && <p className="text-xs font-semibold text-subtle">{chart.subtitle}</p>}
+          <TrendSummary chart={chart} />
+        </figcaption>
+      )}
       {body}
       <Legend chart={chart} />
       {chart.highlight && (
-        <p className="mt-2 text-xs font-bold text-warning">
+        <p className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-extrabold text-warning">
           {humanize(chart.highlight.x)}: {chart.highlight.label}
         </p>
       )}

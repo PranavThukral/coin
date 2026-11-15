@@ -26,6 +26,13 @@ export function shortDate(isoDate: string): string {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(d);
 }
 
+/** "Nov 18, 2026" from "2026-11-18". */
+export function longDate(isoDate: string): string {
+  const d = new Date(`${isoDate}T12:00:00Z`);
+  const format = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return format.format(d);
+}
+
 /** "in 3 days", "today", "tomorrow", "3 days ago". */
 export function relativeDay(isoDate: string, today: string): string {
   const days = Math.round((Date.parse(`${isoDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
