@@ -1,6 +1,6 @@
 import { AppError } from "../errors";
 import {
-  ConfirmRecipientBody, normalizeProposal, Proposal, RULE_LIMITS,
+  CARD_BILL_ID, ConfirmRecipientBody, normalizeProposal, Proposal, RULE_LIMITS,
   type ActionCard, type ActionStatus, type ActionType, type CheckResult, type RuleEvaluation,
   type RuleContext,
 } from "../../contracts";
@@ -24,6 +24,7 @@ export type ActionRow = {
   created_at: string;
   execute_at: string | null;
   executed_at: string | null;
+  origin: "message" | "plan";
 };
 
 export async function lockSession(db: Tx, sessionId: string): Promise<void> {
@@ -91,9 +92,27 @@ function balanceAfter(
   return balance - amount;
 }
 
+/** The user's own account the money lands in (the card owed, or the receiving account), before and after. */
+function destinationBalance(
+  p: ActionProposal | null, amount: number | null, context: RuleContext, status: ActionStatus,
+): ActionCard["destination"] {
+  if (!p || amount === null || status === "executed") return null;
+  const paysCard = p.type === "bill_payment" && p.bill_id === CARD_BILL_ID;
+  let accountId: string | null = paysCard ? "acc_card" : null;
+  if (p.type === "transfer") accountId = p.to_account_id;
+  const account = context.accounts.find((a) => a.id === accountId);
+  if (!account) return null;
+  // The card's balance is what is owed, so a payment brings it down.
+  const after = paysCard ? account.balance_cents - amount : account.balance_cents + amount;
+  return { label: account.name, before_cents: account.balance_cents, after_cents: after };
+}
+
 export async function toActionCard(db: Tx, sessionId: string, action: ActionRow): Promise<ActionCard> {
   const parsed = Proposal.safeParse(action.payload);
-  const context = await loadRuleContext(db, sessionId, action.request_message_id, action.id);
+  const waiting = action.status === "proposed" || action.status === "pending_undo";
+  const context = await loadRuleContext(db, sessionId, action.request_message_id, {
+    actionId: action.id, withPlannedProceeds: waiting,
+  });
   const p = parsed.success ? parsed.data : null;
   const fromId = p && (p.type === "trade" ? p.account_id : p.from_account_id);
   const from = context.accounts.find((account) => account.id === fromId);
@@ -110,6 +129,8 @@ export async function toActionCard(db: Tx, sessionId: string, action: ActionRow)
     primary_message: action.primary_message, created_at: action.created_at,
     execute_at: action.execute_at, executed_at: action.executed_at,
     daily_outflow: await dailyOutflow(db, sessionId),
+    origin: action.origin,
+    destination: destinationBalance(p, amount, context, action.status),
   };
 }
 
@@ -125,11 +146,11 @@ async function saveEvaluation(
 }
 
 export async function proposeAction(
-  db: Db, sessionId: string, requestMessageId: string, raw: unknown,
+  db: Db, sessionId: string, requestMessageId: string, raw: unknown, origin: "message" | "plan" = "message",
 ): Promise<ActionCard> {
   return db.transaction(async (tx) => {
     await lockSession(tx, sessionId);
-    const context = await loadRuleContext(tx, sessionId, requestMessageId);
+    const context = await loadRuleContext(tx, sessionId, requestMessageId, { origin, withPlannedProceeds: true });
     const normalized = normalizeProposal(raw, (ticker) => context.prices[ticker] ?? null);
     const evaluation = normalized.ok ? evaluateRules(normalized.proposal, context) : null;
     const type = normalized.ok ? normalized.proposal.type : "transfer";
@@ -139,11 +160,11 @@ export async function proposeAction(
       ? evaluation?.primary_message : `Malformed proposal: ${normalized.issues.join("; ")}`;
     const [row] = await tx.query<ActionRow>(
       `insert into actions (session_id, request_message_id, type, payload, status, checks,
-       primary_message, requires_second_confirmation)
-       values ($1, $2, $3, $4, $5, $6, $7, $8) returning *`,
+       primary_message, requires_second_confirmation, origin)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning *`,
       [sessionId, requestMessageId, type, JSON.stringify(payload), status,
         JSON.stringify(evaluation?.checks ?? []), message,
-        evaluation?.requires_second_confirmation ?? false],
+        evaluation?.requires_second_confirmation ?? false, origin],
     );
     await audit(tx, sessionId, row.id, "coin", status);
     return toActionCard(tx, sessionId, row);
@@ -163,7 +184,7 @@ export async function confirmRecipient(
       throw new AppError("conflict", "This action does not need a recipient confirmation");
     }
     p.recipient.email = validated;
-    const context = await loadRuleContext(tx, sessionId, row.request_message_id, row.id);
+    const context = await loadRuleContext(tx, sessionId, row.request_message_id, { actionId: row.id });
     context.confirmed_recipient_email = validated;
     const evaluation = evaluateRules(p, context);
     await tx.query(
@@ -182,7 +203,9 @@ export async function approve(db: Db, sessionId: string, actionId: string, now: 
     await lockSession(tx, sessionId);
     const row = await getAction(tx, sessionId, actionId, true);
     if (row.status !== "proposed") throw new AppError("conflict", "This action is no longer waiting for approval");
-    const context = await loadRuleContext(tx, sessionId, row.request_message_id, row.id);
+    const context = await loadRuleContext(tx, sessionId, row.request_message_id, {
+      actionId: row.id, withPlannedProceeds: true,
+    });
     const evaluation = evaluateRules(Proposal.parse(row.payload), context);
     if (!evaluation.allowed || (evaluation.requires_second_confirmation && !row.second_confirmed_at)) {
       throw new AppError("conflict", evaluation.primary_message ?? "Confirm the new recipient first");

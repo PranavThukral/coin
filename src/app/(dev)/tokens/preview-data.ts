@@ -59,6 +59,8 @@ const base: ActionCard = {
   execute_at: null,
   executed_at: null,
   daily_outflow: outflow,
+  origin: "message",
+  destination: null,
 };
 
 export const exampleCards: { label: string; card: ActionCard }[] = [

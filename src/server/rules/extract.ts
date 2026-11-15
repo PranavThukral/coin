@@ -128,11 +128,16 @@ function findQuantities(text: string): number[] {
   return [...text.matchAll(QUANTITY)].map((match) => Number(match[1].replace(/,/g, "")));
 }
 
+/** True when the text holds back from acting: a negation, a hypothetical, a question about the past, or a request for advice. */
+export function declinesAction(input: string): boolean {
+  const text = normalizeText(input);
+  const negationText = text.replace(NON_NEGATING_STOP, "");
+  return NEGATION.test(negationText) || HYPOTHETICAL.test(text) || PAST.test(text) || ADVICE.test(text);
+}
+
 function readIntent(text: string): boolean {
   const verb = INTENT_VERBS.some((value) => boundary(value).test(text));
-  const negationText = text.replace(NON_NEGATING_STOP, "");
-  return verb && !NEGATION.test(negationText) && !HYPOTHETICAL.test(text)
-    && !PAST.test(text) && !ADVICE.test(text);
+  return verb && !declinesAction(text);
 }
 
 export const extractRequestEntities: ExtractRequestEntities = (input) => {

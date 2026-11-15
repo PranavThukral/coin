@@ -540,7 +540,7 @@ export const ACCOUNT_ALIASES: Record<AccountId, readonly string[]> = {
   acc_hisa: ["savings", "saving", "hisa", "high-interest", "high interest"],
   acc_tfsa: ["tfsa", "tax-free", "tax free"],
   acc_rrsp: ["rrsp", "retirement"],
-  acc_nonreg: ["non-registered", "non registered", "nonreg", "personal investing", "investing account", "brokerage"],
+  acc_nonreg: ["non-registered", "non registered", "nonreg", "personal investing", "personal investments", "personal investment", "personal account", "investing account", "brokerage"],
   acc_card: ["card", "credit card", "credit", "visa"],
 };
 
@@ -764,6 +764,14 @@ export interface RuleContext {
    * before that step). For rule 0 it counts the same as an email in the
    * user's message. Never filled from anything the model read. */
   confirmed_recipient_email: string | null;
+  /** How the action came to exist (actions.origin). "plan" means planner code
+   * chose the holdings and share counts for a sale the user asked for without
+   * naming them; rules 0 and 8 then check request_thread for that request
+   * instead of matching tickers and amounts. Absent means "message". */
+  origin?: "message" | "plan";
+  /** The user's own recent messages, oldest first, ending with user_message.
+   * Only ever text the user typed. Read by rules 0 and 8 for origin "plan". */
+  request_thread?: string[];
 }
 
 export type EvaluateRules = (proposal: Proposal, ctx: RuleContext) => RuleEvaluation;
@@ -996,6 +1004,11 @@ export interface ActionCard {
   executed_at: string | null;
   /** Running count of today's outgoing money after this card's state. */
   daily_outflow: DailyOutflow;
+  /** "plan" when the server's sale planner built this step. */
+  origin: "message" | "plan";
+  /** Where the money lands, when that is one of the user's accounts: the
+   * balance before and after (the card owed, or the receiving account). */
+  destination: { label: string; before_cents: number; after_cents: number } | null;
 }
 
 /**

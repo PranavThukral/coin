@@ -3,7 +3,7 @@
  * Same Db interface and the same type parsing as the app's adapter.
  */
 import { PGlite, types } from "@electric-sql/pglite";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { PG_TYPE, parseSafeInt, type Db, type Tx } from "./types";
 
@@ -36,7 +36,10 @@ export async function pgliteDb(): Promise<Db & { pg: PGlite }> {
 /** A fresh in-memory database with the schema applied (no seed data). */
 export async function migratedTestDb(): Promise<Db & { pg: PGlite }> {
   const db = await pgliteDb();
-  const migration = readFileSync(resolve(process.cwd(), "db/migrations/0001_init.sql"), "utf8");
-  await db.pg.exec(migration);
+  const folder = resolve(process.cwd(), "db/migrations");
+  const files = readdirSync(folder).filter((file) => file.endsWith(".sql")).sort();
+  for (const file of files) {
+    await db.pg.exec(readFileSync(resolve(folder, file), "utf8"));
+  }
   return db;
 }

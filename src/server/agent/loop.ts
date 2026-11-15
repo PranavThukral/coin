@@ -11,6 +11,7 @@ import { proposeAction } from "../actions/service";
 import type { Db } from "../db/types";
 import { AppError } from "../errors";
 import * as q from "../db/queries";
+import { planSale } from "../actions/planner";
 import { buildChart } from "../tools/charts";
 import { chartSummaryForModel } from "./chart-summary";
 import { isInsightTool, runInsightTool, type InsightToolName } from "./insight-tools";
@@ -46,7 +47,7 @@ export const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment
 const NOTHING_TO_SHOW = "I couldn't put an answer together for that. Try asking it another way.";
 
 const DEFAULT_STATUS = "Reading your accounts\u2026";
-const STATUS_LABELS: Partial<Record<ToolName | InsightToolName, string>> = {
+const STATUS_LABELS: Partial<Record<ToolName | InsightToolName | "plan_sale", string>> = {
   get_money_snapshot: "Looking at the whole picture\u2026",
   get_cash_flow: "Adding up money in and out\u2026",
   get_category_pace: "Comparing with a typical month\u2026",
@@ -70,7 +71,7 @@ const STATUS_LABELS: Partial<Record<ToolName | InsightToolName, string>> = {
 };
 
 function statusLabel(toolName: string): string {
-  return STATUS_LABELS[toolName as ToolName | InsightToolName] ?? DEFAULT_STATUS;
+  return STATUS_LABELS[toolName as keyof typeof STATUS_LABELS] ?? DEFAULT_STATUS;
 }
 
 type Counts = { proposals: number; proposalAttempts: number; charts: number };
@@ -117,7 +118,21 @@ async function runInsight(options: Options, name: InsightToolName, args: unknown
   return { chart_shown: chart.title, result: output };
 }
 
+/** A sale plan is one proposal, however many steps code gives it. Every step is a card. */
+async function planSaleSteps(options: Options, args: unknown, counts: Counts): Promise<unknown> {
+  if (counts.proposals >= AGENT_LIMITS.max_proposals_per_turn) {
+    return notDone("Only one action or plan fits in one reply.");
+  }
+  const plan = await planSale(options.db, options.sessionId, options.userMessageId, args);
+  if (plan.cards.length > 0) counts.proposals += 1;
+  for (const card of plan.cards) options.emit({ type: "action_card", card });
+  return plan.output;
+}
+
 async function executeTool(options: Options, call: ModelCall, counts: Counts): Promise<unknown> {
+  if (call.name === "plan_sale") {
+    return planSaleSteps(options, JSON.parse(call.arguments), counts);
+  }
   if (isInsightTool(call.name)) {
     return runInsight(options, call.name, JSON.parse(call.arguments), counts);
   }

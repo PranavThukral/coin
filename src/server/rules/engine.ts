@@ -5,6 +5,7 @@ import {
   type RuleContext, type RuleId,
 } from "../../contracts";
 import { extractRequestEntities } from "./extract";
+import { planHasIntent, planMatchesRequest } from "./plan-intent";
 
 type Result = CheckResult & { amountFailure?: boolean };
 type Options = {
@@ -134,6 +135,9 @@ function confirmedEmail(proposal: Etransfer, ctx: RuleContext, emails: string[])
 // R0 protects against actions not authorized by the stored user message.
 function rule0Intent(proposal: Proposal, ctx: RuleContext): Result {
   const rule = "R0_intent";
+  if (ctx.origin === "plan") {
+    return planHasIntent(proposal, ctx) ? pass(rule) : fail(rule);
+  }
   const entities = extractRequestEntities(ctx.user_message.text);
   if (!entities.has_action_intent) {
     return fail(rule);
@@ -414,6 +418,9 @@ function transferRolesMatch(proposal: Transfer, text: string, accounts: string[]
 // R8 protects against changing the user's specified action details.
 function rule8MatchesRequest(proposal: Proposal, ctx: RuleContext): Result {
   const rule = "R8_matches_request";
+  if (ctx.origin === "plan") {
+    return planMatchesRequest(proposal, ctx) ? pass(rule) : fail(rule);
+  }
   const entities = extractRequestEntities(ctx.user_message.text);
   if (proposal.type !== "trade" && entities.amounts_cents.some((a) => a !== proposal.amount_cents)) {
     return fail(rule);

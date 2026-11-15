@@ -110,7 +110,7 @@ describe("paying the credit card", () => {
     const prompt = buildSystemPrompt({ firstName: "Jordan", today: "2026-11-14", viewingAccountName: null });
     expect(prompt).toContain('always type "bill_payment" with bill_id "bill_card"');
     expect(prompt).toContain("Propose even when you can tell a rule will block it: an unsaved bill");
-    expect(prompt).toContain("Never describe this as an error, a failure or a tool problem.");
+    expect(prompt).toContain("Never describe it as an error, a failure or a tool problem.");
     expect(prompt).toContain("- NRTH.CX: Northwind Robotics");
   });
 });

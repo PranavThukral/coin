@@ -200,7 +200,7 @@ export async function settleOne(
       [sessionId, ids],
     );
     // Fresh balances, bills, room and prices, read under the locks above.
-    const context = await loadRuleContext(tx, sessionId, row.request_message_id, row.id);
+    const context = await loadRuleContext(tx, sessionId, row.request_message_id, { actionId: row.id });
     const evaluation = evaluateRules(proposal, context);
     const confirmed = !evaluation.requires_second_confirmation || row.second_confirmed_at !== null;
     const allowed = evaluation.allowed && confirmed;

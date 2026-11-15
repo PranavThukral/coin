@@ -12,6 +12,7 @@ import OpenAI from "openai";
 import type { FunctionTool, ResponseInput } from "openai/resources/responses/responses";
 import { z } from "zod";
 import { AGENT_LIMITS, TOOL_DESCRIPTIONS, ToolInputs, type ToolName } from "../../contracts";
+import { SALE_PLAN_DESCRIPTION, SalePlanInput } from "../actions/planner";
 import { INSIGHT_TOOL_DESCRIPTIONS, InsightToolInputs, type InsightToolName } from "./insight-tools";
 
 export type ModelCall = { id: string; name: string; arguments: string };
@@ -69,7 +70,14 @@ export function toolDefinitions(): FunctionTool[] {
         : schema;
     return { type: "function", name, description: TOOL_DESCRIPTIONS[name], parameters, strict: true };
   });
-  return [...contractTools, ...insightToolDefinitions()];
+  const planSale: FunctionTool = {
+    type: "function",
+    name: "plan_sale",
+    description: SALE_PLAN_DESCRIPTION,
+    parameters: providerSchema(z.toJSONSchema(SalePlanInput)) as Record<string, unknown>,
+    strict: true,
+  };
+  return [...contractTools, ...insightToolDefinitions(), planSale];
 }
 
 function toProviderInput(input: TurnInput[]): ResponseInput {
