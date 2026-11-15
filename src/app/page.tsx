@@ -17,7 +17,7 @@ function AskScene() {
           <Mascot size={26} />
         </span>
         <p className="rounded-[20px] rounded-tl-md bg-surface px-3.5 py-2 text-sm font-medium shadow-coin">
-          Mostly rent and groceries. Dining is up <strong className="font-extrabold">18%</strong> on last month.
+          Mostly rent and groceries. Dining is up <strong className="font-[800]">18%</strong> on last month.
         </p>
       </div>
     </div>
@@ -101,7 +101,7 @@ function FloatingCards() {
           <article className="coin-float rounded-coin-lg bg-surface p-3 shadow-coin-float">
             <div className="h-44 rounded-coin bg-surface-soft p-4">{card.scene}</div>
             <div className="px-3 pb-4 pt-5">
-              <h3 className="font-display text-3xl tracking-tight">{card.title}</h3>
+              <h2 className="text-2xl font-[800] tracking-tight">{card.title}</h2>
               <p className="mt-1.5 text-[15px] font-medium leading-snug text-muted">{card.body}</p>
             </div>
           </article>
@@ -111,97 +111,135 @@ function FloatingCards() {
   );
 }
 
-const STATS = [
-  { label: "Rule checks on every action", value: "9" },
-  { label: "Requests in the test set", value: "40" },
-  { label: "Unsafe actions executed", value: "0" },
-  { label: "Automated tests", value: "463" },
+const MOCK_VALUES = [18, 20, 19, 23, 22, 21, 26, 30, 29, 34, 33, 39, 43, 41];
+const MOCK_SCALE: Scale = { min: 14, max: 46, left: 0, right: 330, top: 6, bottom: 96 };
+const MOCK_ACCOUNTS = [
+  { name: "Everyday Chequing", value: "$2,840.12" },
+  { name: "Personal Investing", value: "$87,286.75" },
+  { name: "TFSA", value: "$97,548.40" },
 ];
 
-/** What the tests measured, as a quiet strip of labelled figures. */
-function Stats() {
+/** The dashboard half of the mock: the net worth figure, its chart and a few accounts. */
+function MockDashboard() {
+  const points = plot(MOCK_VALUES, MOCK_SCALE);
   return (
-    <dl className="coin-rise flex flex-wrap gap-x-8 gap-y-3 font-mono text-[11px] uppercase tracking-wider text-white/55" style={beat(4)}>
-      {STATS.map((stat) => (
-        <div key={stat.label} className="flex items-center gap-2.5">
-          <dt>{stat.label}</dt>
-          <dd className="rounded-md border border-white/15 bg-white/[0.06] px-2 py-1 text-xs font-medium text-white">{stat.value}</dd>
+    <div className="min-w-0 flex-1 p-5">
+      <p className="text-[11px] font-bold text-subtle">Net worth</p>
+      <p className="money text-3xl font-[800] tracking-tight">$349,400</p>
+      <p className="money text-[11px] font-[800] text-gain">+19.4% past year</p>
+      <svg viewBox="0 0 330 100" className="coin-wipe mt-3 block w-full overflow-visible" style={beat(6)}>
+        <defs>
+          <linearGradient id="mock-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--accent)" stopOpacity="0.2" />
+            <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaPath(points, 100)} fill="url(#mock-fill)" />
+        <path d={smoothPath(points)} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+      <ul className="mt-4 space-y-2">
+        {MOCK_ACCOUNTS.map((account) => (
+          <li key={account.name} className="flex items-center justify-between rounded-coin-sm bg-surface-soft px-3 py-2 text-xs font-bold">
+            <span>{account.name}</span>
+            <span className="money">{account.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The Coin half of the mock: a question, a short answer and a card waiting for approval. */
+function MockCoinPanel() {
+  return (
+    <div className="w-[44%] shrink-0 space-y-3 border-l border-border bg-surface-soft/60 p-4">
+      <p className="flex items-center gap-2 text-sm font-[800]">
+        <Mascot size={20} />
+        Coin
+      </p>
+      <p className="ml-auto w-fit rounded-2xl rounded-br-md bg-surface-ink px-3 py-1.5 text-[11px] font-semibold text-on-ink">
+        Move $2,000 to chequing
+      </p>
+      <p className="text-[11px] font-medium text-muted">Here&rsquo;s the card to approve.</p>
+      <div className="rounded-coin-sm bg-surface p-3 shadow-coin">
+        <p className="flex w-fit items-center gap-1 rounded-full bg-gain-soft px-2 py-0.5 text-[9px] font-[800] text-gain">
+          <CheckIcon className="h-2.5 w-2.5" />
+          Checks passed
+        </p>
+        <p className="mt-2 text-[11px] font-[800]">Move to Everyday Chequing</p>
+        <p className="money text-xl font-[800] tracking-tight">$2,000.00</p>
+        <span className="mt-2 block rounded-full bg-accent py-1.5 text-center text-[11px] font-[800] text-accent-ink">Approve</span>
+      </div>
+    </div>
+  );
+}
+
+/** A browser window showing Coin, tilted back behind the pitch. Decorative. */
+function WindowMock() {
+  return (
+    <div className="coin-rise pointer-events-none hidden select-none lg:block" style={beat(3)} aria-hidden="true">
+      <div className="coin-tilt overflow-hidden rounded-coin-lg border border-border bg-surface shadow-coin-float">
+        <div className="flex items-center gap-1.5 border-b border-border px-4 py-2.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+          <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+          <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+          <span className="ml-3 rounded-full bg-surface-soft px-3 py-0.5 text-[10px] font-bold text-subtle">coin / app</span>
         </div>
-      ))}
-    </dl>
+        <div className="flex">
+          <MockDashboard />
+          <MockCoinPanel />
+        </div>
+      </div>
+    </div>
   );
 }
 
-function Nav() {
-  return (
-    <header className="flex items-center justify-between rounded-full border border-white/10 bg-white/[0.07] py-2 pl-5 pr-2 backdrop-blur-md">
-      <span className="flex items-center gap-2.5">
-        <Mascot size={26} />
-        <span className="font-display text-2xl tracking-tight text-white">Coin</span>
-      </span>
-      <nav className="flex items-center gap-1.5 text-sm font-bold">
-        <Link href="/demo" className="rounded-full px-4 py-2 text-white/80 transition-colors hover:text-white">
-          Scripted demo
-        </Link>
-        <Link href="/app" className="rounded-full bg-white px-4 py-2 text-[#0b1030] transition-transform hover:-translate-y-0.5">
-          Try it live
-        </Link>
-      </nav>
-    </header>
-  );
-}
-
-/** The hero: a deep field of blue with one large coin, and the pitch set in a serif. */
 function Hero() {
   return (
-    <section className="coin-hero relative overflow-hidden text-white">
-      <div className="pointer-events-none absolute -right-40 top-24 hidden opacity-95 md:block lg:-right-24" aria-hidden="true">
-        <div className="coin-float">
-          <Mascot size={620} />
+    <section className="grid items-center gap-10 pb-16 pt-10 sm:pt-14 lg:grid-cols-[1.05fr_1fr]">
+      <div>
+        <p className="coin-rise max-w-2xl text-lg font-semibold text-muted sm:text-xl">
+          AI financial agents are surging, so I decided to explore building my own.
+        </p>
+        <h1
+          className="coin-rise mt-3 text-[2.5rem] font-[800] leading-[1.05] tracking-[-0.035em] sm:text-5xl lg:text-[3.5rem]"
+          style={beat(1)}
+        >
+          Meet Coin, an agent that lets you take charge of your finances.
+        </h1>
+        <div className="coin-rise mt-8 flex flex-wrap items-center gap-3" style={beat(2)}>
+          <Link
+            href="/app"
+            className="rounded-full bg-accent px-7 py-3.5 text-base font-[800] text-accent-ink shadow-coin-accent transition-transform hover:-translate-y-0.5"
+          >
+            Try it live
+          </Link>
+          <Link
+            href="/demo"
+            className="rounded-full bg-surface px-7 py-3.5 text-base font-[800] text-foreground shadow-coin transition-transform hover:-translate-y-0.5"
+          >
+            Watch the scripted demo
+          </Link>
         </div>
+        <p className="coin-rise mt-5 text-sm font-semibold text-subtle" style={beat(3)}>
+          Completely synthetic data.
+        </p>
       </div>
-      <div className="relative mx-auto flex min-h-[44rem] max-w-6xl flex-col px-5 pb-12 pt-5 sm:px-8 lg:px-10">
-        <Nav />
-        <div className="mt-auto max-w-3xl pt-24">
-          <p className="coin-rise font-display text-xl italic text-white/75 sm:text-2xl">
-            AI financial agents are surging, so I decided to explore building my own.
-          </p>
-          <h1 className="coin-rise mt-4 font-display text-[2.9rem] leading-[1.02] tracking-[-0.02em] sm:text-6xl lg:text-7xl" style={beat(1)}>
-            Meet Coin, an agent that lets you take charge of your finances.
-          </h1>
-          <div className="coin-rise mt-9 flex flex-wrap items-center gap-3" style={beat(2)}>
-            <Link href="/app" className="rounded-full bg-white px-7 py-3.5 text-base font-bold text-[#0b1030] transition-transform hover:-translate-y-0.5">
-              Try it live
-            </Link>
-            <Link href="/demo" className="rounded-full border border-white/40 px-7 py-3.5 text-base font-bold text-white transition-colors hover:bg-white/10">
-              Watch the scripted demo
-            </Link>
-          </div>
-          <p className="coin-rise mt-5 text-sm font-medium text-white/55" style={beat(3)}>
-            Completely synthetic data.
-          </p>
-        </div>
-        <div className="mt-14 border-t border-white/10 pt-6">
-          <Stats />
-        </div>
-      </div>
+      <WindowMock />
     </section>
   );
 }
 
 export default function Landing() {
   return (
-    <main className="min-h-dvh overflow-x-clip text-foreground">
-      <Hero />
-      <div className="coin-canvas">
-        <div className="mx-auto max-w-6xl px-5 pb-24 pt-20 sm:px-8 lg:px-10">
-          <h2 className="max-w-3xl font-display text-4xl leading-[1.08] tracking-[-0.015em] sm:text-5xl">
-            Ask, see, approve. <span className="text-subtle">The model proposes; code decides what can execute.</span>
-          </h2>
-          <div className="mt-12">
-            <FloatingCards />
-          </div>
-        </div>
+    <main className="coin-canvas min-h-dvh overflow-x-clip text-foreground">
+      <div className="mx-auto max-w-6xl px-5 pb-20 pt-7 sm:px-8 lg:px-10">
+        <header className="flex items-center gap-2.5">
+          <Mascot size={32} />
+          <span className="text-xl font-[800] tracking-tight">Coin</span>
+        </header>
+        <Hero />
+        <FloatingCards />
       </div>
     </main>
   );
