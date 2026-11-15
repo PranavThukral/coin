@@ -13,6 +13,7 @@ import { AppError } from "../errors";
 import * as q from "../db/queries";
 import { buildChart } from "../tools/charts";
 import { chartSummaryForModel } from "./chart-summary";
+import { isInsightTool, runInsightTool, type InsightToolName } from "./insight-tools";
 import { runReadTool } from "../tools/read";
 import type { AgentModel, ModelCall, TurnInput } from "./model";
 import { isUnreadableProposal, proposalResultForModel, repairProposalArguments } from "./proposal-tool";
@@ -45,7 +46,13 @@ export const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment
 const NOTHING_TO_SHOW = "I couldn't put an answer together for that. Try asking it another way.";
 
 const DEFAULT_STATUS = "Reading your accounts\u2026";
-const STATUS_LABELS: Partial<Record<ToolName, string>> = {
+const STATUS_LABELS: Partial<Record<ToolName | InsightToolName, string>> = {
+  get_money_snapshot: "Looking at the whole picture\u2026",
+  get_cash_flow: "Adding up money in and out\u2026",
+  get_category_pace: "Comparing with a typical month\u2026",
+  get_subscriptions: "Finding your subscriptions\u2026",
+  plan_savings_goal: "Working out your goal\u2026",
+  explain_net_worth_change: "Working out what moved your net worth\u2026",
   propose_action: "Checking your action\u2026",
   render_chart: "Building your chart\u2026",
   get_transactions: "Reading your transactions\u2026",
@@ -63,7 +70,7 @@ const STATUS_LABELS: Partial<Record<ToolName, string>> = {
 };
 
 function statusLabel(toolName: string): string {
-  return STATUS_LABELS[toolName as ToolName] ?? DEFAULT_STATUS;
+  return STATUS_LABELS[toolName as ToolName | InsightToolName] ?? DEFAULT_STATUS;
 }
 
 type Counts = { proposals: number; proposalAttempts: number; charts: number };
@@ -101,7 +108,19 @@ async function drawChart(options: Options, args: unknown, counts: Counts): Promi
   return chartSummaryForModel(chart);
 }
 
+/** An insight tool's numbers go to the model; its chart, if it drew one, goes to the user. */
+async function runInsight(options: Options, name: InsightToolName, args: unknown, counts: Counts): Promise<unknown> {
+  const { output, chart } = await runInsightTool(options.db, options.sessionId, name, args);
+  if (!chart || counts.charts >= AGENT_LIMITS.max_charts_per_turn) return output;
+  counts.charts += 1;
+  options.emit({ type: "chart", chart });
+  return { chart_shown: chart.title, result: output };
+}
+
 async function executeTool(options: Options, call: ModelCall, counts: Counts): Promise<unknown> {
+  if (isInsightTool(call.name)) {
+    return runInsight(options, call.name, JSON.parse(call.arguments), counts);
+  }
   if (!(call.name in ToolInputs)) {
     return notDone(`There is no tool called ${call.name}.`);
   }

@@ -11,10 +11,12 @@ import { OverviewPanel } from "./overview-panel";
 import type { CardControls, useCoinChat } from "./use-coin-chat";
 
 const SUGGESTIONS = [
+  "How am I doing overall?",
   "Where did my money go this month?",
-  "How have my investments done, and what am I concentrated in?",
-  "What's coming up in the next two weeks?",
-  "Move $2,000 from savings to chequing",
+  "How much do I save each month?",
+  "How have my investments done?",
+  "How long would it take to save $10,000?",
+  "Pay my hydro bill",
 ];
 
 export const DISCLAIMER = "Made-up data. An AI financial agent demo.";

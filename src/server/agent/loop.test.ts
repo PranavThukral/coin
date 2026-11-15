@@ -261,3 +261,29 @@ describe("a visitor who leaves mid-reply", () => {
     expect(saved).toHaveLength(1);
   });
 });
+
+describe("insight tools", () => {
+  it("shows the tool's own chart and hands the model the numbers", async () => {
+    const model = fakeModel([[call("get_cash_flow", { months: 3, chart: true })], []]);
+    const events = await send("How much do I save each month?", model, await fixture.newSession());
+
+    const charts = events.filter((event) => event.type === "chart");
+    expect(charts).toHaveLength(1);
+    const result = toolResult(model, 1) as { chart_shown: string; result: { months: unknown[] } };
+    expect(result.chart_shown).toBe("Money in vs money out");
+    expect(result.result.months).toHaveLength(3);
+  });
+
+  it("counts those charts against the per-reply limit", async () => {
+    const ask = (id: string) => call("get_cash_flow", { months: 2, chart: true }, id);
+    const model = fakeModel([[ask("c1"), ask("c2"), ask("c3"), ask("c4")], []]);
+    const events = await send("Show me my cash flow four times", model, await fixture.newSession());
+    expect(events.filter((event) => event.type === "chart")).toHaveLength(3);
+  });
+
+  it("names bad arguments so the model can correct them", async () => {
+    const model = fakeModel([[call("plan_savings_goal", { target_cad: -5, chart: true })], []]);
+    await send("How long to save?", model, await fixture.newSession());
+    expect(toolResult(model, 1).outcome).toBe("invalid_arguments");
+  });
+});

@@ -68,3 +68,48 @@ export function recurringChanges(rows: Transaction[], today: string): RecurringC
   }
   return [...groups.values()].flatMap(group => changesForGroup(group, today));
 }
+
+export interface RecurringCharge {
+  merchant: string;
+  account_id: Transaction["account_id"];
+  frequency: "weekly" | "monthly";
+  amount_cents: number;
+  /** The charge spread over a month (a weekly charge counts 52/12 times). */
+  monthly_cost_cents: number;
+  last_charged: string;
+}
+
+const STOPPED_AFTER_DAYS = { weekly: 11, monthly: 45 };
+
+/** A steady charge on a steady rhythm that is still running (a price change doesn't break it). */
+function activeCharge(rows: Transaction[], today: string): RecurringCharge | null {
+  rows.sort((a, b) => a.posted_on.localeCompare(b.posted_on));
+  if (rows.length < 3) return null;
+  const frequency = cadence(rows);
+  if (!frequency) return null;
+  const steady = rows.every(row => similarAmount(rows[0], row)) || priceChange(rows) !== null;
+  const last = rows[rows.length - 1];
+  if (!steady || daysBetween(last.posted_on, today) > STOPPED_AFTER_DAYS[frequency]) return null;
+  const amount = -last.amount_cents;
+  return {
+    merchant: last.merchant,
+    account_id: last.account_id,
+    frequency,
+    amount_cents: amount,
+    monthly_cost_cents: frequency === "weekly" ? Math.round((amount * 52) / 12) : amount,
+    last_charged: last.posted_on,
+  };
+}
+
+/** Subscriptions and other recurring charges still active today, most expensive first. */
+export function recurringCharges(rows: Transaction[], today: string): RecurringCharge[] {
+  const groups = new Map<string, Transaction[]>();
+  for (const row of rows) {
+    const key = `${row.account_id}:${row.merchant}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  const charges = [...groups.values()].map(group => activeCharge(group, today));
+  return charges
+    .filter((charge): charge is RecurringCharge => charge !== null)
+    .sort((a, b) => b.monthly_cost_cents - a.monthly_cost_cents);
+}

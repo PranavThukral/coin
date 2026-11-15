@@ -221,7 +221,7 @@ const ACTIVE_DOT = { r: 5, strokeWidth: 3, stroke: "var(--surface)" };
 
 /** In a two-series comparison the earlier period is quiet and the current one leads. */
 function barColour(chart: ChartPayload, index: number): string {
-  if (chart.kind !== "grouped_bar" || chart.series.length !== 2) return colour(index);
+  if (chart.source !== "category_change" || chart.series.length !== 2) return colour(index);
   return index === 0 ? "var(--border-strong)" : colour(0);
 }
 
