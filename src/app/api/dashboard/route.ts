@@ -1,23 +1,13 @@
-import { addDays, type ChartRequest } from "../../../contracts";
+import { addDays } from "../../../contracts";
+import { chartRequest } from "../../../lib/chart-request";
+import * as q from "../../../server/db/queries";
 import { dailyOutflow } from "../../../server/actions/context";
 import type { Db } from "../../../server/db/types";
 import { withSession } from "../../../server/session/http";
 import { buildChart } from "../../../server/tools/charts";
 import { runReadTool } from "../../../server/tools/read";
 
-const NET_WORTH_CHART: ChartRequest = {
-  source: "net_worth_over_time",
-  title: "Net worth",
-  kind: "line",
-  from: null,
-  to: null,
-  compare_from: null,
-  compare_to: null,
-  account_id: null,
-  category: null,
-  ticker: null,
-  days: null,
-};
+const NET_WORTH_CHART = chartRequest("net_worth_over_time", "Net worth", { kind: "line" });
 
 const RECENT_TRANSACTIONS = {
   account_id: null,
@@ -44,24 +34,19 @@ async function monthChangeCents(db: Db, sessionId: string, today: string): Promi
 
 export function GET(request: Request) {
   return withSession(request, async ({ db, sessionId }) => {
-    const [session] = await db.query<{ today_date: string }>(
-      "select today_date from sessions where id = $1",
-      [sessionId],
-    );
-    const [accounts, recent, upcoming, netWorth, monthChange, outflow] = await Promise.all([
+    const today = (await q.sessionInfo(db, sessionId)).today_date;
+    const [accounts, recent, upcoming, monthChange, outflow] = await Promise.all([
       runReadTool(db, sessionId, "get_accounts", {}),
       runReadTool(db, sessionId, "get_transactions", RECENT_TRANSACTIONS),
       runReadTool(db, sessionId, "get_upcoming", { days: 14 }),
-      buildChart(db, sessionId, NET_WORTH_CHART),
-      monthChangeCents(db, sessionId, session.today_date),
+      monthChangeCents(db, sessionId, today),
       dailyOutflow(db, sessionId),
     ]);
     return Response.json({
-      today: session.today_date,
+      today,
       accounts,
       recent_transactions: recent,
       upcoming,
-      net_worth: netWorth,
       month_change_cents: monthChange,
       daily_outflow: outflow,
     });

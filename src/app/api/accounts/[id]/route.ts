@@ -1,20 +1,9 @@
-import { AccountId, INVESTMENT_ACCOUNT_TYPES, type AccountView, type ChartRequest } from "../../../../contracts";
+import { AccountId, INVESTMENT_ACCOUNT_TYPES, type AccountView } from "../../../../contracts";
+import { chartRequest } from "../../../../lib/chart-request";
 import { AppError } from "../../../../server/errors";
 import { withSession } from "../../../../server/session/http";
 import { buildChart } from "../../../../server/tools/charts";
 import { runReadTool } from "../../../../server/tools/read";
-
-const EMPTY_CHART: Omit<ChartRequest, "source" | "title"> = {
-  kind: null,
-  from: null,
-  to: null,
-  compare_from: null,
-  compare_to: null,
-  account_id: null,
-  category: null,
-  ticker: null,
-  days: null,
-};
 
 export function GET(request: Request, route: { params: Promise<{ id: string }> }) {
   return withSession(request, async ({ db, sessionId }) => {
@@ -27,11 +16,10 @@ export function GET(request: Request, route: { params: Promise<{ id: string }> }
     if (!account) throw new AppError("not_found", "Account not found");
 
     const investment = INVESTMENT_ACCOUNT_TYPES.includes(account.type);
-    const chartRequest: ChartRequest = investment
-      ? { ...EMPTY_CHART, source: "portfolio_value_over_time", title: "Value", account_id: accountId }
-      : { ...EMPTY_CHART, source: "account_balance_over_time", title: "Balance", account_id: accountId };
+    const source = investment ? "portfolio_value_over_time" : "account_balance_over_time";
+    const chart = chartRequest(source, investment ? "Value" : "Balance", { account_id: accountId });
 
-    const [transactions, holdings, chart] = await Promise.all([
+    const [transactions, holdings, builtChart] = await Promise.all([
       runReadTool(db, sessionId, "get_transactions", {
         account_id: accountId,
         from: null,
@@ -41,9 +29,9 @@ export function GET(request: Request, route: { params: Promise<{ id: string }> }
         limit: 40,
       }),
       investment ? runReadTool(db, sessionId, "get_holdings", { account_id: accountId }) : Promise.resolve(null),
-      buildChart(db, sessionId, chartRequest),
+      buildChart(db, sessionId, chart),
     ]);
 
-    return Response.json({ account, transactions, holdings, chart });
+    return Response.json({ account, transactions, holdings, chart: builtChart });
   });
 }

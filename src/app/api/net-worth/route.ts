@@ -1,22 +1,11 @@
-import type { ChartRequest } from "../../../contracts";
+import { chartRequest } from "../../../lib/chart-request";
 import { isNetWorthRange, mergePoints, seriesStarts, type NetWorthPoint } from "../../../lib/net-worth";
+import * as q from "../../../server/db/queries";
 import { AppError } from "../../../server/errors";
 import { withSession } from "../../../server/session/http";
 import { buildChart } from "../../../server/tools/charts";
 
-const NET_WORTH_CHART: ChartRequest = {
-  source: "net_worth_over_time",
-  title: "Net worth",
-  kind: "line",
-  from: null,
-  to: null,
-  compare_from: null,
-  compare_to: null,
-  account_id: null,
-  category: null,
-  ticker: null,
-  days: null,
-};
+const NET_WORTH_CHART = chartRequest("net_worth_over_time", "Net worth", { kind: "line" });
 
 /**
  * Net worth over one range of the hero chart (read-only). The chart builder
@@ -28,11 +17,7 @@ export function GET(request: Request) {
     const range = new URL(request.url).searchParams.get("range");
     if (!isNetWorthRange(range)) throw new AppError("invalid", "Unknown range.");
 
-    const [session] = await db.query<{ today_date: string }>(
-      "select today_date from sessions where id = $1",
-      [sessionId],
-    );
-    const today = session.today_date;
+    const today = (await q.sessionInfo(db, sessionId)).today_date;
     const charts = await Promise.all(
       seriesStarts(range, today).map((from) => buildChart(db, sessionId, { ...NET_WORTH_CHART, from, to: today })),
     );

@@ -18,8 +18,6 @@ export interface SeededTestDb {
   newSession(today?: string): Promise<string>;
 }
 
-let cachedSeed: Promise<Db> | null = null;
-
 async function seededTemplate(): Promise<Db> {
   const db = await migratedTestDb();
   await insertSeed(db);
@@ -47,10 +45,4 @@ export async function seededTestDb(options: { today?: string } = {}): Promise<Se
     today,
     newSession: (otherToday = today) => createSession(db, otherToday),
   };
-}
-
-/** Shared read-only seeded DB for suites that never write. */
-export function sharedSeededTemplate(): Promise<Db> {
-  cachedSeed ??= seededTemplate();
-  return cachedSeed;
 }

@@ -33,7 +33,12 @@ function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie") ?? "";
   for (const part of header.split(";")) {
     const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
+    if (key !== name) continue;
+    try {
+      return decodeURIComponent(rest.join("="));
+    } catch {
+      return null; // not valid percent-encoding: treat it as no cookie
+    }
   }
   return null;
 }
@@ -103,9 +108,4 @@ export async function withSession(
 
   if (cookie) response.headers.append("Set-Cookie", cookie);
   return response;
-}
-
-/** The session id carried by an already-resolved request, for tests and logs. */
-export function sessionIdFrom(request: Request): string | null {
-  return readCookie(request, SESSION.cookie_name);
 }

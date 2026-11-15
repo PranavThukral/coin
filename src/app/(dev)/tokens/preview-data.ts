@@ -128,28 +128,13 @@ export const exampleCards: { label: string; card: ActionCard }[] = [
   { label: "Cancelled", card: { ...base, status: "cancelled", title: "Pay your credit card" } },
 ];
 
-export const colourRoles = [
-  ["background", "Canvas"],
-  ["surface", "Cards"],
-  ["surface-soft", "Inset surfaces"],
-  ["foreground", "Primary text"],
-  ["muted", "Secondary text"],
-  ["border", "Dividers"],
-  ["accent", "Coin / primary action"],
-  ["gain", "Gain"],
-  ["loss", "Loss + label"],
-  ["warning", "Caution"],
-  ["blocked", "Blocked + label"],
-  ["pending", "Pending"],
-] as const;
-
 export const chartSeries = [
-  { name: "Evergreen", value: 76 },
-  { name: "Clay", value: 110 },
-  { name: "Iris", value: 62 },
-  { name: "River", value: 96 },
-  { name: "Ochre", value: 85 },
-  { name: "Berry", value: 50 },
+  { name: "Housing", value: 76 },
+  { name: "Groceries", value: 110 },
+  { name: "Dining", value: 62 },
+  { name: "Shopping", value: 96 },
+  { name: "Transport", value: 85 },
+  { name: "Other", value: 50 },
 ];
 
 export { money } from "../../../lib/format";

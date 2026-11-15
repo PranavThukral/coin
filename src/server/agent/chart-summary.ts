@@ -3,16 +3,15 @@
  * browser; the model gets the key numbers code computed for it, so it can say
  * what the chart means ("up **$4,210** since March") without inventing figures.
  */
-import type { ChartPayload } from "../../contracts";
+import { UNTRUSTED_NOTE, type ChartPayload } from "../../contracts";
+import { money } from "../../lib/format";
 
 const MOST_CATEGORIES = 8;
 
 type Point = Record<string, string | number | null>;
 
 function formatValue(value: number, format: ChartPayload["value_format"]): string {
-  if (format === "cad") {
-    return (value / 100).toLocaleString("en-CA", { style: "currency", currency: "CAD" });
-  }
+  if (format === "cad") return money(value);
   if (format === "percent") return `${value}%`;
   return value.toLocaleString("en-CA");
 }
@@ -55,7 +54,10 @@ export function chartSummaryForModel(chart: ChartPayload): Record<string, unknow
   for (const { key, label } of chart.series) {
     series[label] = chart.x.type === "date" ? trendSummary(chart, key) : breakdownSummary(chart, key);
   }
+  // Category labels can be merchant or payee names: text from the ledger.
+  const labelsAreData = chart.x.type === "category";
   return {
+    ...(labelsAreData ? { untrusted_data_note: UNTRUSTED_NOTE } : {}),
     outcome: "chart_shown",
     title: chart.title,
     period: chart.subtitle,

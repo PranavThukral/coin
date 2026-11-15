@@ -76,9 +76,11 @@ export async function recordUsage(
   const { input, output } = tokenPrices();
   // Tokens x (USD per million tokens) is already micro-USD.
   const costMicroUsd = Math.ceil(usage.inputTokens * input + usage.outputTokens * output);
+  // The session row may be gone by now (the visitor restarted mid-reply);
+  // the call was still paid for, so it is recorded either way.
   await db.query(
     `insert into usage_ledger (at, day_toronto, session_id, ip_hash, model, input_tokens, output_tokens, cost_micro_usd)
-     select $2, $3, id, ip_hash, $4, $5, $6, $7 from sessions where id = $1`,
+     values ($2, $3, $1, (select ip_hash from sessions where id = $1), $4, $5, $6, $7)`,
     [
       usage.sessionId,
       usage.now.toISOString(),
@@ -89,4 +91,5 @@ export async function recordUsage(
       costMicroUsd,
     ],
   );
+
 }

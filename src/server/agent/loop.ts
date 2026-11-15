@@ -41,7 +41,7 @@ const TURN_TIME_LIMIT_MS = 45_000;
 /** One retry when the model's proposal arguments could not be read. */
 const MAX_PROPOSAL_ATTEMPTS = 2;
 
-const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment.";
+export const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment.";
 const NOTHING_TO_SHOW = "I couldn't put an answer together for that. Try asking it another way.";
 
 const DEFAULT_STATUS = "Reading your accounts\u2026";
@@ -109,7 +109,7 @@ async function executeTool(options: Options, call: ModelCall, counts: Counts): P
   const parsed = JSON.parse(call.arguments);
   if (name === "propose_action") {
     // The tool's schema wraps the proposal, since a tool's root must be an object.
-    return propose(options, parsed.proposal ?? parsed, counts);
+    return propose(options, parsed?.proposal ?? parsed, counts);
   }
   if (name === "render_chart") {
     return drawChart(options, parsed, counts);

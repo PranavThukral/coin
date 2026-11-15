@@ -11,6 +11,7 @@
  * charts, which are computed live. Dates use {d+N} tokens.
  */
 import type { AccountId, ChartRequest, ModelProposal } from "../contracts";
+import { chartRequest } from "../lib/chart-request";
 
 export type TurnItem =
   | { kind: "status"; label: string }
@@ -34,20 +35,7 @@ export interface DemoStep {
 
 const chart = (source: ChartRequest["source"], title: string, extra: Partial<ChartRequest> = {}): TurnItem => ({
   kind: "chart",
-  request: {
-    source,
-    title,
-    kind: null,
-    from: null,
-    to: null,
-    compare_from: null,
-    compare_to: null,
-    account_id: null,
-    category: null,
-    ticker: null,
-    days: null,
-    ...extra,
-  },
+  request: chartRequest(source, title, extra),
 });
 
 export const DEMO_STEPS: DemoStep[] = [

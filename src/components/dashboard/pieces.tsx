@@ -2,7 +2,13 @@
 
 // Small dashboard building blocks. Pure presentation; data comes in as props.
 // Lists reveal row by row, and a figure that changes counts to its new value.
-import type { AccountView, Transaction } from "../../contracts";
+import {
+  CASH_ACCOUNT_TYPES,
+  INVESTMENT_ACCOUNT_TYPES,
+  type AccountType,
+  type AccountView,
+  type Transaction,
+} from "../../contracts";
 import type { UpcomingEvent } from "../../lib/api";
 import { money, relativeDay, shortDate, signedMoney } from "../../lib/format";
 import { CardGlyph, CashGlyph, ChevronIcon, TrendGlyph } from "../ui/icons";
@@ -27,10 +33,10 @@ export interface Totals {
 }
 
 export function totalsOf(accounts: AccountView[]): Totals {
-  const sum = (types: string[]) =>
+  const sum = (types: readonly AccountType[]) =>
     accounts.filter((a) => types.includes(a.type)).reduce((total, a) => total + a.total_value_cents, 0);
-  const cash = sum(["chequing", "hisa"]);
-  const investments = sum(["tfsa", "rrsp", "non_registered"]);
+  const cash = sum(CASH_ACCOUNT_TYPES);
+  const investments = sum(INVESTMENT_ACCOUNT_TYPES);
   const card = sum(["credit_card"]);
   return { cash, investments, card, netWorth: cash + investments + card };
 }
@@ -57,9 +63,9 @@ export function HeroStats({ totals }: { totals: Totals }) {
   );
 }
 
-const GROUPS: { title: string; types: string[]; glyph: React.ReactNode }[] = [
-  { title: "Cash", types: ["chequing", "hisa"], glyph: <CashGlyph /> },
-  { title: "Investments", types: ["tfsa", "rrsp", "non_registered"], glyph: <TrendGlyph /> },
+const GROUPS: { title: string; types: readonly AccountType[]; glyph: React.ReactNode }[] = [
+  { title: "Cash", types: CASH_ACCOUNT_TYPES, glyph: <CashGlyph /> },
+  { title: "Investments", types: INVESTMENT_ACCOUNT_TYPES, glyph: <TrendGlyph /> },
   { title: "Credit", types: ["credit_card"], glyph: <CardGlyph /> },
 ];
 

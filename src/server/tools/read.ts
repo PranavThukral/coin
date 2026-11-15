@@ -1,4 +1,6 @@
-import { addDays, dollarsToCents, ToolInputs, UNTRUSTED_NOTE, type ToolName } from "../../contracts";
+import {
+  addDays, dollarsToCents, INVESTMENT_ACCOUNT_TYPES, ToolInputs, UNTRUSTED_NOTE, type ToolName,
+} from "../../contracts";
 import type { Tx } from "../db/types";
 import { AppError } from "../errors";
 import * as q from "../db/queries";
@@ -17,7 +19,7 @@ export async function runReadTool(db: Tx, sid: string, name: ReadName, input: un
       ToolInputs.get_accounts.parse(input);
       const [accounts, holdings] = await Promise.all([q.accounts(db, sid), holdingViews(db, sid)]);
       return accounts.map(a => {
-        const investment = ["tfsa", "rrsp", "non_registered"].includes(a.type);
+        const investment = INVESTMENT_ACCOUNT_TYPES.includes(a.type);
         const market = investment
           ? holdings.filter(h => h.account_id === a.id).reduce((s, h) => s + h.market_value_cents, 0)
           : null;
@@ -84,7 +86,7 @@ export async function runReadTool(db: Tx, sid: string, name: ReadName, input: un
         q.transactions(db, sid), q.accounts(db, sid),
       ]);
       const investments = accounts.filter(a =>
-        ["tfsa", "rrsp", "non_registered"].includes(a.type) && (!p.account_id || a.id === p.account_id),
+        INVESTMENT_ACCOUNT_TYPES.includes(a.type) && (!p.account_id || a.id === p.account_id),
       );
       const series = holdingsSeries.map(point => {
         const cash = investments.reduce((sum, account) => {

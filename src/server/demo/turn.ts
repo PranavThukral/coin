@@ -9,6 +9,7 @@ import { fillDateTokens, type ChatEvent } from "../../contracts";
 import type { MessagePart } from "../../lib/chat";
 import type { DemoStep, TurnItem } from "../../demo/script";
 import { proposeAction } from "../actions/service";
+import * as q from "../db/queries";
 import type { Db } from "../db/types";
 import { buildChart } from "../tools/charts";
 
@@ -83,10 +84,10 @@ export async function runScriptedTurn(
     sessionId,
     step.prompt ?? "",
   ]);
-  const [session] = await db.query<{ today_date: string }>("select today_date from sessions where id = $1", [sessionId]);
+  const today = (await q.sessionInfo(db, sessionId)).today_date;
 
   emit({ type: "message_start", message_id: assistantId });
-  const ctx: TurnContext = { db, sessionId, today: session.today_date, userMessageId, emit, timing, parts: [] };
+  const ctx: TurnContext = { db, sessionId, today, userMessageId, emit, timing, parts: [] };
   let text = "";
   for (const item of step.turn ?? []) {
     text += await runItem(item, ctx);

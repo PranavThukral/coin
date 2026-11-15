@@ -259,7 +259,6 @@ function ProductSamples() {
 
 function ChartPalette() {
   const max = Math.max(...chartSeries.map((s) => s.value));
-  const names = ["Housing", "Groceries", "Dining", "Shopping", "Transport", "Other"];
   return (
     <div className="mt-8 rounded-coin bg-surface p-6 shadow-coin">
       <p className="font-extrabold">Spending by category</p>
@@ -270,7 +269,7 @@ function ChartPalette() {
               className="w-full max-w-16 rounded-t-lg"
               style={{ height: (series.value / max) * 140, background: `var(--chart-${i + 1})` }}
             />
-            <p className="text-xs font-bold">{names[i]}</p>
+            <p className="text-xs font-bold">{series.name}</p>
           </div>
         ))}
       </div>
