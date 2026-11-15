@@ -59,7 +59,9 @@ export function useTweenedList(target: number[], ms = 900): number[] {
     });
   }, [target, ms]);
 
-  return shown;
+  // A list of a new length has nothing to glide from: show it at once,
+  // without waiting for the next frame.
+  return shown.length === target.length ? shown : target;
 }
 
 /** True for a moment after `value` changes (not on first render). Drives the row flash. */
