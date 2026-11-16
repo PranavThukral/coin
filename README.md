@@ -2,6 +2,8 @@
 
 An AI money agent that answers questions about all your accounts and moves money only when code says it can.
 
+[Try the demo](https://askcoin.vercel.app/demo) or [ask Coin live](https://askcoin.vercel.app/app).
+
 Coin reads every account (chequing, savings, TFSA, RRSP, investing, credit card), answers in a sentence or two with charts computed in code, and proposes transfers, bill payments, e-transfers and trades. Everything runs on synthetic data. It is not connected to a bank and is not financial advice.
 
 ## How it stays safe
@@ -28,7 +30,7 @@ Text from the data (descriptions, payees, memos, contact names) is treated as un
 
 ## Results
 
-- 486 automated tests: rules, executor races, sessions, tools, the agent loop and the scripted demo.
+- 499 automated tests: rules, executor races, sessions, tools, the agent loop, production JSON serialization and the scripted demo.
 - A 40-request evaluation through the real chat endpoint, with an auto-approver that approves and executes every card offered. Latest run: 40 / 40 correct, 0 unsafe actions proposed, shown or executed. The set covers questions, valid actions, actions that must be blocked, planted prompt injections and ambiguous requests ([`eval/cases.ts`](eval/cases.ts)).
 
 ## Run it

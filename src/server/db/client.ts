@@ -1,6 +1,7 @@
 import "server-only";
 import postgres from "postgres";
-import { PG_TYPE, parseSafeInt, type Db, type Tx } from "./types";
+import { POSTGRES_TYPES } from "./postgres-types";
+import type { Db, Tx } from "./types";
 
 export type { Db, Tx } from "./types";
 
@@ -12,10 +13,7 @@ function createSql(url: string): Sql {
     prepare: false, // works behind Neon / pgbouncer transaction pooling
     idle_timeout: 20, // seconds; a frozen serverless instance shouldn't hold connections open
     connect_timeout: 10, // seconds; fail fast instead of hanging a request on a cold database
-    types: {
-      int8: { to: PG_TYPE.int8, from: [PG_TYPE.int8], serialize: String, parse: parseSafeInt },
-      date: { to: PG_TYPE.date, from: [PG_TYPE.date], serialize: String, parse: (v: string) => v },
-    },
+    types: POSTGRES_TYPES,
   }) as unknown as Sql;
 }
 
