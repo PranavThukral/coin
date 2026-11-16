@@ -108,7 +108,29 @@ function billNamed(proposal: Payment, ctx: RuleContext): boolean {
   return waysToName(terms).some((term) => word(text, term));
 }
 
+const TRANSFER_START = /^(?:(?:please|can you|could you|would you)\s+)*(?:move|transfer|put|deposit|withdraw)\s+/i;
+const WHOLE_CASH = /^(?:all\b|everything\b|(?:(?:the|my|its)\s+)?(?:(?:full|whole|entire)\s+)?balance\b|(?:(?:the|my)\s+)?(?:full|whole|entire)\b)/i;
+const TRANSFER_REFERENCE = /^(?:please\s+)?(?:transfer|move)\s+(?:it|that)(?:\s+(?:please|now))?[.!]*$/i;
+
+/** "Everything from HISA into chequing" means that named cash account's balance. */
+function wholeTransferValue(proposal: Transfer, ctx: RuleContext): number | undefined {
+  const text = ctx.user_message.text.trim();
+  if (!TRANSFER_START.test(text) || !WHOLE_CASH.test(text.replace(TRANSFER_START, ""))) {
+    return undefined;
+  }
+  const named = extractRequestEntities(text).accounts_mentioned;
+  const source = findAccount(ctx, proposal.from_account_id);
+  if (!named.includes(proposal.from_account_id) || !named.includes(proposal.to_account_id)
+    || !source || !["hisa", "chequing"].includes(source.type)) {
+    return undefined;
+  }
+  return source.balance_cents;
+}
+
 function fullValue(proposal: Proposal, ctx: RuleContext): number | null | undefined {
+  if (proposal.type === "transfer") {
+    return wholeTransferValue(proposal, ctx);
+  }
   if (proposal.type !== "bill_payment") {
     return undefined;
   }
@@ -160,7 +182,8 @@ function rule0Intent(proposal: Proposal, ctx: RuleContext): Result {
   }
   if (proposal.type !== "trade") {
     const amountMatches = entities.amounts_cents.includes(proposal.amount_cents);
-    const fullMatches = entities.full_amount && fullValue(proposal, ctx) === proposal.amount_cents;
+    const fullMatches = (entities.full_amount || proposal.type === "transfer")
+      && fullValue(proposal, ctx) === proposal.amount_cents;
     if (!amountMatches && !fullMatches && !billAmountAsListed(proposal, ctx, entities.amounts_cents)) {
       return fail(rule);
     }
@@ -438,6 +461,10 @@ function rule8MatchesRequest(proposal: Proposal, ctx: RuleContext): Result {
     return planMatchesRequest(proposal, ctx) ? pass(rule) : fail(rule);
   }
   const entities = extractRequestEntities(ctx.user_message.text);
+  if (proposal.type === "transfer") {
+    const whole = wholeTransferValue(proposal, ctx);
+    if (whole !== undefined && whole !== proposal.amount_cents) return fail(rule);
+  }
   if (proposal.type !== "trade" && entities.amounts_cents.some((a) => a !== proposal.amount_cents)) {
     return fail(rule);
   }
@@ -504,13 +531,19 @@ function toCheckResult(result: Result): CheckResult {
 function requestText(ctx: RuleContext): string {
   const latest = ctx.user_message.text;
   const earlier = (ctx.request_thread ?? []).slice(0, -1);
-  if (extractRequestEntities(latest).has_action_intent || declinesAction(latest) || !isShortAnswer(latest)) {
+  const transferReference = TRANSFER_REFERENCE.test(latest.trim());
+  if ((extractRequestEntities(latest).has_action_intent && !transferReference)
+    || declinesAction(latest) || !isShortAnswer(latest)) {
     return latest;
   }
   for (let i = earlier.length - 1; i >= 0; i -= 1) {
+    if (declinesAction(earlier[i])) return latest;
+    if (transferReference && TRANSFER_REFERENCE.test(earlier[i].trim())) continue;
     if (extractRequestEntities(earlier[i]).has_action_intent) {
+      if (transferReference && !TRANSFER_START.test(earlier[i].trim())) return latest;
       return `${earlier[i]} ${latest}`;
     }
+    if (transferReference || earlier[i].includes("?")) return latest;
   }
   return latest;
 }
