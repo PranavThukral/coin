@@ -88,7 +88,7 @@ To use a real database, set `DATABASE_URL` and run `npm run db:migrate && npm ru
 | Contracts | [`src/contracts.ts`](src/contracts.ts), [`db/migrations`](db/migrations) | Types, schemas, seed facts, rule limits, wire formats |
 | Fake bank | [`scripts/seed`](scripts/seed) | Two years of deterministic history; each visitor gets their own copy, shifted to their real calendar day |
 | Read tools and charts | [`src/server/tools`](src/server/tools) | Every number a chart shows is computed here |
-| Rules | [`src/server/rules`](src/server/rules) | Pure functions; over 230 tests, many table-driven, including adversarial phrasings and planted injections |
+| Rules | [`src/server/rules`](src/server/rules) | Pure functions; 226 tests, many table-driven, including adversarial phrasings and planted injections |
 | Actions and executor | [`src/server/actions`](src/server/actions) | Propose, approve, undo, execute now; row locks and one conditional status flip |
 | Sessions | [`src/server/session`](src/server/session) | Per-visitor clone, idle expiry, midnight rollover, capped creation |
 | Agent | [`src/server/agent`](src/server/agent) | GPT-6 Luna on the Responses API, tool loop, spend ledger, rate limits |
