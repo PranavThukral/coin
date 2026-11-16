@@ -12,7 +12,7 @@ import type { MessagePart } from "../../lib/chat";
 import type { Db } from "../db/types";
 import { AppError } from "../errors";
 import type { SessionContext } from "../session/http";
-import { runAgent, type HistoryMessage } from "./loop";
+import { GENERIC_ERROR, runAgent, type HistoryMessage } from "./loop";
 import { createAgentModel, type AgentModel } from "./model";
 import { buildSystemPrompt } from "./prompt";
 import { checkBudget, checkRateLimit, recordUsage, tokenPrices } from "./spend";
@@ -27,7 +27,6 @@ export type Emit = (event: ChatEvent) => void;
 export type StreamControls = { emit: Emit; clientGone: () => boolean };
 
 const STREAM_HEADERS = { "content-type": "text/event-stream", "cache-control": "no-cache, no-transform" };
-const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment.";
 
 /**
  * Runs `run` and streams what it emits. If the visitor leaves mid-reply, emit
@@ -146,6 +145,7 @@ export async function chat(request: Request, context: SessionContext): Promise<R
       db,
       sessionId,
       userMessageId,
+      userText: body.message,
       history,
       viewingAccountId: body.viewing_account_id,
       model,

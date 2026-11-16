@@ -12,6 +12,8 @@ import OpenAI from "openai";
 import type { FunctionTool, ResponseInput } from "openai/resources/responses/responses";
 import { z } from "zod";
 import { AGENT_LIMITS, TOOL_DESCRIPTIONS, ToolInputs, type ToolName } from "../../contracts";
+import { SALE_PLAN_DESCRIPTION, SalePlanInput } from "../actions/planner";
+import { INSIGHT_TOOL_DESCRIPTIONS, InsightToolInputs, type InsightToolName } from "./insight-tools";
 
 export type ModelCall = { id: string; name: string; arguments: string };
 
@@ -48,9 +50,19 @@ function providerSchema(value: unknown): unknown {
   return Object.fromEntries(entries);
 }
 
+function insightToolDefinitions(): FunctionTool[] {
+  return (Object.keys(InsightToolInputs) as InsightToolName[]).map((name) => ({
+    type: "function",
+    name,
+    description: INSIGHT_TOOL_DESCRIPTIONS[name],
+    parameters: providerSchema(z.toJSONSchema(InsightToolInputs[name])) as Record<string, unknown>,
+    strict: true,
+  }));
+}
+
 /** propose_action's union is wrapped in an object, since a tool's root must be an object. */
 export function toolDefinitions(): FunctionTool[] {
-  return (Object.keys(ToolInputs) as ToolName[]).map((name) => {
+  const contractTools = (Object.keys(ToolInputs) as ToolName[]).map((name): FunctionTool => {
     const schema = providerSchema(z.toJSONSchema(ToolInputs[name])) as Record<string, unknown>;
     const parameters =
       name === "propose_action"
@@ -58,6 +70,14 @@ export function toolDefinitions(): FunctionTool[] {
         : schema;
     return { type: "function", name, description: TOOL_DESCRIPTIONS[name], parameters, strict: true };
   });
+  const planSale: FunctionTool = {
+    type: "function",
+    name: "plan_sale",
+    description: SALE_PLAN_DESCRIPTION,
+    parameters: providerSchema(z.toJSONSchema(SalePlanInput)) as Record<string, unknown>,
+    strict: true,
+  };
+  return [...contractTools, ...insightToolDefinitions(), planSale];
 }
 
 function toProviderInput(input: TurnInput[]): ResponseInput {

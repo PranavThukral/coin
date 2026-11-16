@@ -9,6 +9,7 @@ import type {
   OverviewPayload,
   Transaction,
 } from "../contracts";
+import type { NetWorthRange, NetWorthSeries } from "./net-worth";
 
 /** Read tools wrap free text from the ledger; the UI shows it as plain text. */
 export type Wrapped<T> = { untrusted_data_note: string; data: T };
@@ -30,9 +31,10 @@ export interface UpcomingEvent {
 export interface DashboardPayload {
   today: string;
   accounts: AccountView[];
+  /** All-time gain or loss of each investment account's holdings, by account id. */
+  account_gains: Record<string, number>;
   recent_transactions: Wrapped<Transaction[]>;
   upcoming: Wrapped<UpcomingEvent[]>;
-  net_worth: ChartPayload;
   /** Net worth now minus net worth at the end of last month. */
   month_change_cents: number | null;
   daily_outflow: DailyOutflow;
@@ -67,6 +69,7 @@ export const api = {
   /** Establishes the session cookie; call once before parallel requests. */
   session: () => request<{ today: string; expires_at: string }>("/api/session"),
   dashboard: () => request<DashboardPayload>("/api/dashboard"),
+  netWorth: (range: NetWorthRange) => request<NetWorthSeries>(`/api/net-worth?range=${range}`),
   account: (id: string) => request<AccountDetailPayload>(`/api/accounts/${id}`),
   overview: (accountId: string | null) =>
     request<OverviewPayload>(accountId ? `/api/overview?account_id=${accountId}` : "/api/overview"),

@@ -189,6 +189,43 @@ function generateCardCycle(ledger: Ledger, date: string) {
   if (cardTotal > 0) ledger.pair(date, "acc_chequing", "acc_card", cardTotal, true);
 }
 
+/** Market swings as a share of price: a single stock moves more than an index fund, a bond fund least. */
+const SWING: Record<string, number> = { stock: 0.07, etf: 0.035, bond: 0.012 };
+/** Cycles over the two years, slow to fast, each weaker than the last: together they read as a market. */
+const WAVES = [2, 5, 11, 23, 47, 97];
+/** The last trading days ease back onto the exact closing price the seed facts name. */
+const SETTLE_DAYS = 15;
+
+/** A repeatable number in 0..1 from a string (the same seed gives the same history every run). */
+function unit(text: string): number {
+  let hash = 2166136261;
+  for (const char of text) {
+    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  }
+  return ((hash >>> 0) % 100_000) / 100_000;
+}
+
+/** How far this day sits above or below the trend, as a share of price. Zero on the final day. */
+/** NRTH's planted spring drawdown stays a clean slide: swings fade out around it. */
+function outsideDrawdown(ticker: string, date: string): number {
+  if (ticker !== "NRTH.CX") return 1;
+  const away = Math.max(daysBetween(date, "2026-05-01"), daysBetween("2026-06-12", date));
+  return Math.max(0, Math.min(1, away / 21));
+}
+
+function marketSwing(security: { ticker: string; kind: string }, index: number, days: number, date: string): number {
+  const progress = index / (days - 1);
+  let wave = 0;
+  WAVES.forEach((cycles, n) => {
+    const phase = unit(`${security.ticker}-wave-${n}`) * Math.PI * 2;
+    wave += Math.sin(progress * cycles * Math.PI * 2 + phase) / (n + 1.5);
+  });
+  const jitter = (unit(`${security.ticker}-day-${index}`) - 0.5) * 0.5;
+  const settle = Math.min(1, (days - 1 - index) / SETTLE_DAYS);
+  const size = security.ticker === "BOND.CX" ? SWING.bond : SWING[security.kind] ?? SWING.etf;
+  return (wave + jitter) * size * settle * outsideDrawdown(security.ticker, date);
+}
+
 function generatePrices(): Price[] {
   const weekdays = dates().filter(date => ![0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay()));
   return SEED_SECURITIES.flatMap(security => weekdays.map((date, index) => {
@@ -201,6 +238,7 @@ function generatePrices(): Price[] {
         : daysBetween(date, "2026-08-01") / 50;
       factor -= 0.22 * dip;
     }
+    factor *= 1 + marketSwing(security, index, weekdays.length, date);
     return { ticker: security.ticker, date, close_cents: Math.round(security.as_of_close_cents * factor) };
   }));
 }

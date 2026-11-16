@@ -24,6 +24,8 @@ export interface CardControls {
   confirmRecipient(card: ActionCard, email: string): Promise<void>;
   useInstead(card: ActionCard): Promise<void>;
   settle(card: ActionCard): Promise<void>;
+  /** A plan's steps, one after another in order (sales before the transfer that moves their proceeds). */
+  each(cards: ActionCard[], step: "approve" | "dismiss" | "undo" | "executeNow" | "settle"): Promise<void>;
 }
 
 const SETTLE_ATTEMPTS = 10;
@@ -158,6 +160,12 @@ export function useCoinChat(transport: ChatTransport, onActionSettled: () => voi
       }
     },
     settle,
+    each: async (cards, step) => {
+      const waitingFor = { approve: "proposed", dismiss: "proposed", undo: "pending_undo", executeNow: "pending_undo", settle: "pending_undo" };
+      for (const card of cards) {
+        if (card.status === waitingFor[step]) await controls[step](card);
+      }
+    },
   };
 
   return { chat, getChat, send, controls };

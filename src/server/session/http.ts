@@ -33,7 +33,12 @@ function readCookie(request: Request, name: string): string | null {
   const header = request.headers.get("cookie") ?? "";
   for (const part of header.split(";")) {
     const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
+    if (key !== name) continue;
+    try {
+      return decodeURIComponent(rest.join("="));
+    } catch {
+      return null; // not valid percent-encoding: treat it as no cookie
+    }
   }
   return null;
 }
@@ -88,7 +93,10 @@ export async function withSession(
 
   try {
     const db = database();
-    const ipHash = hashIp(ip, process.env.IP_HASH_SALT ?? "");
+    // Local development has one IP for every browser and screenshot, so the
+    // per-IP cap on new sessions only applies to a deployed Coin.
+    const local = process.env.NODE_ENV === "development";
+    const ipHash = local ? null : hashIp(ip, process.env.IP_HASH_SALT ?? "");
     const session = await resolveSession(db, cookieValue, now, ipHash);
     // Refresh on every response: the browser's expiry slides with activity,
     // matching the server's idle window.
@@ -100,9 +108,4 @@ export async function withSession(
 
   if (cookie) response.headers.append("Set-Cookie", cookie);
   return response;
-}
-
-/** The session id carried by an already-resolved request, for tests and logs. */
-export function sessionIdFrom(request: Request): string | null {
-  return readCookie(request, SESSION.cookie_name);
 }

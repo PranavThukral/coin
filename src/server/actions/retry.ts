@@ -104,7 +104,7 @@ export async function retryAtMax(db: Db, sessionId: string, actionId: string): P
   if (!parsed.success) throw new AppError("conflict", "This action can't be retried.");
 
   // Re-check now, so the offer reflects current balances, not a stale card.
-  const context = await loadRuleContext(db, sessionId, original.request_message_id, original.id);
+  const context = await loadRuleContext(db, sessionId, original.request_message_id, { actionId: original.id });
   const max = evaluateRules(parsed.data, context).max_passing_amount_cents;
   if (max === null || !("amount_cents" in parsed.data)) {
     throw new AppError("conflict", "There's no smaller amount that would pass.");

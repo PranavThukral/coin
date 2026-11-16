@@ -35,6 +35,6 @@ describe("action rule context", () => {
     expect(result.used_cents).toBe(10000);
     expect(result.pending_cents).toBe(10000);
     expect(result.items[0].action_id).toBe(action.id);
-    expect((await loadRuleContext(db, sessionId, message.id, action.id)).daily_used_cents).toBe(0);
+    expect((await loadRuleContext(db, sessionId, message.id, { actionId: action.id })).daily_used_cents).toBe(0);
   });
 });

@@ -108,9 +108,9 @@ describe("paying the credit card", () => {
 
   it("the prompt names bill_card and tells the model to propose what rules will block", () => {
     const prompt = buildSystemPrompt({ firstName: "Jordan", today: "2026-11-14", viewingAccountName: null });
-    expect(prompt).toContain('always type "bill_payment" with bill_id "bill_card"');
-    expect(prompt).toContain("Propose even when you can tell a rule will block it: an unsaved bill");
-    expect(prompt).toContain("Never describe this as an error, a failure or a tool problem.");
+    expect(prompt).toContain('type "bill_payment" with bill_id "bill_card"');
+    expect(prompt).toContain("propose it exactly as asked, even if you expect a limit to stop it");
+    expect(prompt).toContain("Propose only when the user asks for an action.");
     expect(prompt).toContain("- NRTH.CX: Northwind Robotics");
   });
 });
@@ -185,7 +185,7 @@ describe("proposals the code cannot read", () => {
     expect(toolResult(model, 1).outcome).toBe("invalid_arguments");
     expect(toolResult(model, 2).outcome).toBe("card_shown_for_approval");
     expect(toolResult(model, 3).outcome).toBe("not_done");
-    expect(cards(events).map((card) => card.title)).toEqual(["Buy 5 shares of NRTH.CX"]);
+    expect(cards(events).map((card) => card.title)).toEqual(["Buy 5 shares of Northwind Robotics"]);
 
     // The unreadable attempt is still on record as blocked.
     const rows = await fixture.db.query<{ status: string }>(
@@ -259,5 +259,31 @@ describe("a visitor who leaves mid-reply", () => {
     expect(slowModel.turns).toHaveLength(1);
     const saved = await fixture.db.query("select id from messages where session_id = $1 and role = 'assistant'", [sid]);
     expect(saved).toHaveLength(1);
+  });
+});
+
+describe("insight tools", () => {
+  it("shows the tool's own chart and hands the model the numbers", async () => {
+    const model = fakeModel([[call("get_cash_flow", { months: 3, chart: true })], []]);
+    const events = await send("How much do I save each month?", model, await fixture.newSession());
+
+    const charts = events.filter((event) => event.type === "chart");
+    expect(charts).toHaveLength(1);
+    const result = toolResult(model, 1) as { chart_shown: string; result: { months: unknown[] } };
+    expect(result.chart_shown).toBe("Money in vs money out");
+    expect(result.result.months).toHaveLength(3);
+  });
+
+  it("shows the same chart once, however many times the model asks for it", async () => {
+    const ask = (id: string) => call("get_cash_flow", { months: 2, chart: true }, id);
+    const model = fakeModel([[ask("c1"), ask("c2"), ask("c3"), ask("c4")], []]);
+    const events = await send("Show me my cash flow four times", model, await fixture.newSession());
+    expect(events.filter((event) => event.type === "chart")).toHaveLength(1);
+  });
+
+  it("names bad arguments so the model can correct them", async () => {
+    const model = fakeModel([[call("plan_savings_goal", { target_cad: -5, chart: true })], []]);
+    await send("How long to save?", model, await fixture.newSession());
+    expect(toolResult(model, 1).outcome).toBe("invalid_arguments");
   });
 });

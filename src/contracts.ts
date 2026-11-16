@@ -540,14 +540,14 @@ export const ACCOUNT_ALIASES: Record<AccountId, readonly string[]> = {
   acc_hisa: ["savings", "saving", "hisa", "high-interest", "high interest"],
   acc_tfsa: ["tfsa", "tax-free", "tax free"],
   acc_rrsp: ["rrsp", "retirement"],
-  acc_nonreg: ["non-registered", "non registered", "nonreg", "personal investing", "investing account", "brokerage"],
+  acc_nonreg: ["non-registered", "non registered", "nonreg", "personal investing", "personal investments", "personal investment", "personal account", "investing account", "brokerage"],
   acc_card: ["card", "credit card", "credit", "visa"],
 };
 
 /** Phrases that mean "the whole balance/amount" for bill payments (the card
  * included). When present, the engine treats the bill's amount_cents (for
  * bill_card: the card's statement balance) as the amount the user asked for. */
-export const FULL_AMOUNT_PHRASES = ["in full", "full balance", "whole balance", "entire balance", "the balance", "all of it", "statement balance", "full amount"] as const;
+export const FULL_AMOUNT_PHRASES = ["in full", "full balance", "whole balance", "entire balance", "the balance", "all of it", "statement balance", "full amount", "pay off", "pay it off", "payoff", "clear my card", "clear the card"] as const;
 
 /* ========================================================================== */
 /* 5. ACTION PROPOSALS                                                        */
@@ -764,6 +764,14 @@ export interface RuleContext {
    * before that step). For rule 0 it counts the same as an email in the
    * user's message. Never filled from anything the model read. */
   confirmed_recipient_email: string | null;
+  /** How the action came to exist (actions.origin). "plan" means planner code
+   * chose the holdings and share counts for a sale the user asked for without
+   * naming them; rules 0 and 8 then check request_thread for that request
+   * instead of matching tickers and amounts. Absent means "message". */
+  origin?: "message" | "plan";
+  /** The user's own recent messages, oldest first, ending with user_message.
+   * Only ever text the user typed. Read by rules 0 and 8 for origin "plan". */
+  request_thread?: string[];
 }
 
 export type EvaluateRules = (proposal: Proposal, ctx: RuleContext) => RuleEvaluation;
@@ -849,7 +857,7 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   get_transactions: "Search transactions. Use summarize_spending for totals instead of adding these up yourself.",
   summarize_spending: "Code-computed spending totals for a date range, grouped. Use for any totals.",
   compare_spending: "Code-computed spending in period A vs period B with deltas.",
-  find_recurring_changes: "Recurring charges whose price or frequency changed, and new or stopped ones.",
+  find_recurring_changes: "Recurring charges whose price or frequency changed, and new or stopped ones. The tool for 'did anything get more expensive' and 'what changed'.",
   get_holdings: "Holdings with quantity, cost, market value, gain and weight of total portfolio.",
   get_portfolio_performance: "Portfolio value over time, contributions, and return for a range.",
   get_price_history: "Daily closes for one ticker.",
@@ -894,12 +902,18 @@ export interface AffordabilityResult {
   /** Largest amount that keeps chequing >= buffer through the window. */
   max_comfortable_cents: number;
   upcoming_considered: Array<{ label: string; date: IsoDateStr; amount_cents: number }>;
+  /** How much more chequing would need to stay at or above the buffer (0 when it does). */
+  shortfall_cents: number;
+  /** What is in savings, which could cover a shortfall with a transfer. */
+  savings_balance_cents: number;
+  /** One-tap requests that would make it work, built from balances (empty when nothing is short). */
+  suggested_requests: string[];
 }
 
 /** Hard ceilings on one agent turn. */
 export const AGENT_LIMITS = {
   max_tool_steps: 6,
-  max_proposals_per_turn: 1,
+  max_proposals_per_turn: 3, // several only when the user asked for each one
   max_charts_per_turn: 3,
   max_input_chars: 800,
   max_output_tokens: 900,
@@ -996,6 +1010,11 @@ export interface ActionCard {
   executed_at: string | null;
   /** Running count of today's outgoing money after this card's state. */
   daily_outflow: DailyOutflow;
+  /** "plan" when the server's sale planner built this step. */
+  origin: "message" | "plan";
+  /** Where the money lands, when that is one of the user's accounts: the
+   * balance before and after (the card owed, or the receiving account). */
+  destination: { label: string; before_cents: number; after_cents: number } | null;
 }
 
 /**
@@ -1035,6 +1054,8 @@ export type ChatEvent =
   | { type: "text_delta"; text: string }
   | { type: "chart"; chart: ChartPayload }
   | { type: "action_card"; card: ActionCard }
+  /** Follow-up questions to offer under the reply. Chosen by code, never written by the model. */
+  | { type: "suggestions"; items: string[] }
   | { type: "error"; code: "budget_exhausted" | "rate_limited" | "input_too_long" | "model_error" | "session_expired"; message: string }
   | { type: "done" };
 

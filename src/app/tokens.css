@@ -1,22 +1,23 @@
-/* Coin design tokens, v2.
- * Neutrals are an explicit light-to-dark grey ladder; text and surfaces step
- * along it for contrast. Emerald is for actions and gains. Coin-gold belongs
- * to Coin (the mascot and its presence) and the money it talks about.
+/* Coin design tokens, v3.
+ * A calm near-white canvas (graphite in dark mode) with layered white cards.
+ * One accent, ultramarine, for actions and the charts' lead series.
+ * Green and red are semantic only: gains and losses on numbers.
+ * Coin-gold belongs to Coin's mark.
  */
 
 :root,
 [data-theme="light"] {
   color-scheme: light;
 
-  /* Grey ladder */
+  /* Grey ladder: surfaces step up, text steps down. */
   --grey-0: #ffffff;
-  --grey-50: #f5f6f4;
-  --grey-100: #ebedea;
-  --grey-200: #d7dbd6;
-  --grey-300: #b9c0b9;
-  --grey-500: #67716a;
-  --grey-700: #353e39;
-  --grey-900: #111814;
+  --grey-50: #f3f4f7;
+  --grey-100: #f7f8fa;
+  --grey-200: #e4e7ec;
+  --grey-300: #c9ced8;
+  --grey-500: #667085;
+  --grey-700: #343b49;
+  --grey-900: #0c0e13;
 }
 
 /* Roles are declared on every themed element (not just :root) so the
@@ -26,9 +27,6 @@
   --background: var(--grey-100);
   --surface: var(--grey-0);
   --surface-soft: var(--grey-50);
-  --surface-ink: var(--grey-900); /* the one dark, bold surface: the balance hero */
-  --on-ink: #f5f6f4;
-  --on-ink-muted: #b9c0b9;
   --foreground: var(--grey-900);
   --muted: var(--grey-700);
   --subtle: var(--grey-500);
@@ -38,84 +36,111 @@
 
 :root,
 [data-theme="light"] {
-  --accent: #0a7c55;
-  --accent-strong: #075e41;
-  --accent-soft: #dcf3e8;
+  --surface-raised: #ffffff;
+  --surface-ink: #0c0e13; /* the one dark surface: your own messages */
+  --on-ink: #f7f8fa;
+  --on-ink-muted: #b4bac6;
+
+  --accent: #2b44ff;
+  --accent-strong: #1c31d9;
+  --accent-text: #2b44ff;
+  --accent-soft: #e9ecff;
   --accent-ink: #ffffff;
 
-  --gold: #e9a80f;
-  --gold-light: #f8c94a;
+  --gold: #f0ae1b;
+  --gold-light: #ffd66b;
   --gold-deep: #8a5d00;
   --gold-ink: #3b2a00;
   --gold-soft: #fdf1d3;
 
-  --gain: #0a7c55;
-  --gain-soft: #dcf3e8;
-  --loss: #c42f27;
+  --gain: #088a4f;
+  --gain-soft: #e1f6ea;
+  --loss: #d1362b;
   --loss-soft: #fdeceb;
   --loss-border: #f0b4af;
   --warning: #9a5a00;
   --warning-soft: #fff1d6;
-  --blocked: #c42f27;
-  --pending: #5b3fd4;
-  --pending-soft: #ece7ff;
+  --blocked: #d1362b;
+  --pending: #2b44ff;
+  --pending-soft: #e9ecff;
 
-  --chart-1: #0a7c55;
-  --chart-2: #b88200;
-  --chart-3: #5b3fd4;
-  --chart-4: #c8365f;
-  --chart-5: #0e94b0;
-  --chart-6: #7f6a00;
+  /* Categorical order is fixed and validated for colour-blind separation. */
+  --chart-1: #2b44ff;
+  --chart-2: #e8710a;
+  --chart-3: #0e9aa7;
+  --chart-4: #b88a00;
+  --chart-5: #d6408f;
+  --chart-6: #7a4dd8;
 
-  --shadow-card: 0 1px 2px rgba(17, 24, 20, 0.06), 0 8px 24px rgba(17, 24, 20, 0.08);
+  --canvas-glow:
+    radial-gradient(1100px 560px at 12% -8%, rgba(43, 68, 255, 0.1), transparent 62%),
+    radial-gradient(900px 520px at 96% -4%, rgba(240, 174, 27, 0.09), transparent 60%);
+  /* In the app, a surface is drawn by a hairline and a whisper of shadow, not a glow. */
+  --shadow-card: 0 0 0 1px rgba(12, 14, 19, 0.07), 0 1px 2px rgba(12, 14, 19, 0.04);
+  --shadow-float: 0 0 0 1px rgba(12, 14, 19, 0.08), 0 2px 6px -2px rgba(12, 14, 19, 0.06), 0 16px 32px -20px rgba(12, 14, 19, 0.16);
+  --shadow-accent: 0 1px 2px rgba(12, 14, 19, 0.14), 0 4px 12px -6px rgba(43, 68, 255, 0.5);
+  /* The landing page's cards float higher. */
+  --shadow-landing:
+    0 0 0 1px rgba(12, 14, 19, 0.05), 0 2px 4px rgba(12, 14, 19, 0.04), 0 18px 36px -16px rgba(12, 14, 19, 0.2),
+    0 44px 90px -34px rgba(27, 41, 140, 0.3);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --grey-0: #161e1a;
-  --grey-50: #1d2621;
-  --grey-100: #0d1311;
-  --grey-200: #2b3731;
-  --grey-300: #3d4b44;
-  --grey-500: #8e9993;
-  --grey-700: #c6cec8;
-  --grey-900: #f3f5f2;
+  --grey-0: #14161b;
+  --grey-50: #1b1e25;
+  --grey-100: #0a0c14;
+  --grey-200: #262a33;
+  --grey-300: #3a3f4b;
+  --grey-500: #8a91a0;
+  --grey-700: #bcc2ce;
+  --grey-900: #f5f6f8;
 
-  --surface-ink: #1f2b25;
-  --on-ink: #f3f5f2;
-  --on-ink-muted: #a9b3ad;
+  --surface-raised: #1d2027;
+  --surface-ink: #262a33;
+  --on-ink: #f5f6f8;
+  --on-ink-muted: #aab0bd;
 
-  --accent: #3fd69a;
-  --accent-strong: #7be6bb;
-  --accent-soft: #123526;
-  --accent-ink: #052a1b;
+  --accent: #4d63ff;
+  --accent-strong: #6377ff;
+  --accent-text: #96a4ff;
+  --accent-soft: #1a1f45;
+  --accent-ink: #ffffff;
 
   --gold: #f5bd3a;
-  --gold-light: #ffd56e;
+  --gold-light: #ffd978;
   --gold-deep: #a8740a;
   --gold-ink: #3b2a00;
-  --gold-soft: #3a2e10;
+  --gold-soft: #33290f;
 
-  --gain: #3fd69a;
-  --gain-soft: #123526;
-  --loss: #ff8a80;
-  --loss-soft: #3a1c1a;
+  --gain: #3ddc84;
+  --gain-soft: #11301f;
+  --loss: #ff7468;
+  --loss-soft: #3a1a18;
   --loss-border: #7a2e29;
   --warning: #f2b54c;
-  --warning-soft: #3a2a0e;
-  --blocked: #ff8a80;
-  --pending: #a994ff;
-  --pending-soft: #262046;
+  --warning-soft: #36280d;
+  --blocked: #ff7468;
+  --pending: #96a4ff;
+  --pending-soft: #1a1f45;
 
-  --chart-1: #1fa572;
-  --chart-2: #b98410;
-  --chart-3: #8d72f0;
-  --chart-4: #e95887;
-  --chart-5: #2a9cc8;
-  --chart-6: #a08f2a;
+  --chart-1: #5b70ff;
+  --chart-2: #d9661f;
+  --chart-3: #1a9e96;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #9b7bea;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --canvas-glow:
+    radial-gradient(1200px 640px at 10% -10%, rgba(77, 99, 255, 0.34), transparent 64%),
+    radial-gradient(900px 560px at 98% -6%, rgba(150, 96, 255, 0.16), transparent 62%),
+    radial-gradient(1000px 620px at 78% 108%, rgba(34, 170, 190, 0.11), transparent 64%),
+    radial-gradient(700px 480px at -6% 96%, rgba(77, 99, 255, 0.12), transparent 62%);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 16px 32px -18px rgba(0, 0, 0, 0.7);
+  --shadow-landing: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.75), 0 44px 90px -30px rgba(0, 0, 0, 0.85);
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px -8px rgba(77, 99, 255, 0.6);
 }
 
 /* Follow the system setting when no theme is forced. */
@@ -123,49 +148,59 @@
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --grey-0: #161e1a;
-    --grey-50: #1d2621;
-    --grey-100: #0d1311;
-    --grey-200: #2b3731;
-    --grey-300: #3d4b44;
-    --grey-500: #8e9993;
-    --grey-700: #c6cec8;
-    --grey-900: #f3f5f2;
+    --grey-0: #14161b;
+    --grey-50: #1b1e25;
+    --grey-100: #0a0c14;
+    --grey-200: #262a33;
+    --grey-300: #3a3f4b;
+    --grey-500: #8a91a0;
+    --grey-700: #bcc2ce;
+    --grey-900: #f5f6f8;
 
-    --surface-ink: #1f2b25;
-    --on-ink: #f3f5f2;
-    --on-ink-muted: #a9b3ad;
+    --surface-raised: #1d2027;
+    --surface-ink: #262a33;
+    --on-ink: #f5f6f8;
+    --on-ink-muted: #aab0bd;
 
-    --accent: #3fd69a;
-    --accent-strong: #7be6bb;
-    --accent-soft: #123526;
-    --accent-ink: #052a1b;
+    --accent: #4d63ff;
+    --accent-strong: #6377ff;
+    --accent-text: #96a4ff;
+    --accent-soft: #1a1f45;
+    --accent-ink: #ffffff;
 
     --gold: #f5bd3a;
-    --gold-light: #ffd56e;
+    --gold-light: #ffd978;
     --gold-deep: #a8740a;
     --gold-ink: #3b2a00;
-    --gold-soft: #3a2e10;
+    --gold-soft: #33290f;
 
-    --gain: #3fd69a;
-    --gain-soft: #123526;
-    --loss: #ff8a80;
-    --loss-soft: #3a1c1a;
+    --gain: #3ddc84;
+    --gain-soft: #11301f;
+    --loss: #ff7468;
+    --loss-soft: #3a1a18;
     --loss-border: #7a2e29;
     --warning: #f2b54c;
-    --warning-soft: #3a2a0e;
-    --blocked: #ff8a80;
-    --pending: #a994ff;
-    --pending-soft: #262046;
+    --warning-soft: #36280d;
+    --blocked: #ff7468;
+    --pending: #96a4ff;
+    --pending-soft: #1a1f45;
 
-    --chart-1: #1fa572;
-    --chart-2: #b98410;
-    --chart-3: #8d72f0;
-    --chart-4: #e95887;
-    --chart-5: #2a9cc8;
-    --chart-6: #a08f2a;
+    --chart-1: #5b70ff;
+    --chart-2: #d9661f;
+    --chart-3: #1a9e96;
+    --chart-4: #c98500;
+    --chart-5: #d55181;
+    --chart-6: #9b7bea;
 
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --canvas-glow:
+      radial-gradient(1200px 640px at 10% -10%, rgba(77, 99, 255, 0.34), transparent 64%),
+      radial-gradient(900px 560px at 98% -6%, rgba(150, 96, 255, 0.16), transparent 62%),
+      radial-gradient(1000px 620px at 78% 108%, rgba(34, 170, 190, 0.11), transparent 64%),
+      radial-gradient(700px 480px at -6% 96%, rgba(77, 99, 255, 0.12), transparent 62%);
+    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 16px 32px -18px rgba(0, 0, 0, 0.7);
+  --shadow-landing: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.75), 0 44px 90px -30px rgba(0, 0, 0, 0.85);
+    --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px -8px rgba(77, 99, 255, 0.6);
   }
 }
 
@@ -173,6 +208,7 @@
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-soft: var(--surface-soft);
+  --color-surface-raised: var(--surface-raised);
   --color-surface-ink: var(--surface-ink);
   --color-on-ink: var(--on-ink);
   --color-on-ink-muted: var(--on-ink-muted);
@@ -183,6 +219,7 @@
   --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-text: var(--accent-text);
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
   --color-gold: var(--gold);
@@ -206,10 +243,18 @@
   --color-chart-6: var(--chart-6);
 
   --font-sans: var(--font-coin), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-coin-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* Weight is used sparingly: the heaviest text is a firm bold, not a shout. */
+  --font-weight-extrabold: 650;
+  --font-weight-bold: 600;
+  --font-weight-semibold: 550;
   --radius-coin-sm: 10px;
-  --radius-coin: 18px;
-  --radius-coin-lg: 28px;
+  --radius-coin: 14px;
+  --radius-coin-lg: 18px;
   --shadow-coin: var(--shadow-card);
+  --shadow-coin-landing: var(--shadow-landing);
+  --shadow-coin-float: var(--shadow-float);
+  --shadow-coin-accent: var(--shadow-accent);
   --ease-coin: cubic-bezier(0.2, 0, 0, 1);
 }
 
@@ -218,7 +263,133 @@
   font-feature-settings: "tnum";
 }
 
+/* The calm canvas: one flat tone with two soft lights behind the cards. */
+.coin-canvas {
+  background-color: var(--background);
+  background-image: var(--canvas-glow);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+/* The window mock on the landing page: tilted back and to one side, like a screen seen from the left. */
+.coin-tilt {
+  transform: perspective(1600px) rotateY(-16deg) rotateX(6deg) rotate(1.5deg) scale(1.06);
+  transform-origin: left center;
+}
+
+/* The demo pointer's click: a ring that opens and fades where it pressed. */
+@keyframes coin-click {
+  from { transform: scale(0.35); opacity: 0.45; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+.coin-click {
+  animation: coin-click 480ms var(--ease-coin) both;
+}
+
+/* The demo's countdown: a darker band that crosses the Next step button. */
+@keyframes coin-countdown {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.coin-countdown {
+  transform-origin: left;
+  animation: coin-countdown linear both;
+}
+
 /* ---------------------------------------------------------------- motion */
+
+/* Reveal: things that just happened rise into place, one after another.
+   Set --i on each item of a list to stagger it. */
+@keyframes coin-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.coin-rise {
+  animation: coin-rise 560ms var(--ease-coin) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes coin-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.coin-fade {
+  animation: coin-fade 700ms var(--ease-coin) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* A card changing state: the new state settles in from slightly small. */
+@keyframes coin-swap {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+.coin-swap { animation: coin-swap 420ms var(--ease-coin) both; }
+
+/* Landing cards hover gently, each on its own beat (--i). */
+@keyframes coin-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.coin-float {
+  animation: coin-float 7s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -2.3s);
+}
+
+/* A line drawing itself. The path needs pathLength="1". */
+@keyframes coin-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.coin-draw {
+  stroke-dasharray: 1;
+  animation: coin-draw 1400ms var(--ease-coin) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* A whole chart revealed left to right, as if its line were being drawn. */
+@keyframes coin-wipe {
+  from { clip-path: inset(-12px 100% -12px -12px); }
+  to { clip-path: inset(-12px); }
+}
+.coin-wipe {
+  animation: coin-wipe 1500ms var(--ease-coin) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* The newest point on the hero chart breathes. */
+@keyframes coin-pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
+.coin-pulse { animation: coin-pulse 2.2s ease-out infinite; }
+
+/* A bar growing from its baseline. */
+@keyframes coin-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.coin-grow {
+  transform-origin: bottom;
+  animation: coin-grow 700ms var(--ease-coin) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* A value that just changed: one soft wash of the accent behind it. */
+@keyframes coin-flash {
+  0% { background-color: color-mix(in srgb, var(--accent) 16%, transparent); }
+  100% { background-color: transparent; }
+}
+.coin-flash { animation: coin-flash 1600ms ease-out both; }
+
+/* Coin is writing: three dots take turns. */
+@keyframes coin-dot {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+.coin-dot {
+  animation: coin-dot 1.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 160ms);
+}
 
 /* Executed: the check draws itself, then the card settles with one pulse. */
 @keyframes coin-check-draw {
@@ -226,8 +397,8 @@
   to { stroke-dashoffset: 0; }
 }
 @keyframes coin-settle {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gain) 45%, transparent), var(--shadow-card); }
-  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--gain) 0%, transparent), var(--shadow-card); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gain) 45%, transparent), var(--shadow-float); }
+  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--gain) 0%, transparent), var(--shadow-float); }
 }
 @keyframes coin-pop {
   0% { transform: scale(0.6); opacity: 0; }
@@ -252,12 +423,16 @@
   animation: coin-strike 500ms var(--ease-coin) 150ms both;
 }
 
-/* Pending: the undo ring drains over the real 60 seconds. */
-@keyframes coin-drain {
-  from { stroke-dashoffset: 0; }
-  to { stroke-dashoffset: var(--ring-length); }
+/* The trail on an action card: each finished step fills its segment. */
+@keyframes coin-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
-.coin-undo-ring { animation: coin-drain 60s linear both; }
+.coin-fill {
+  transform-origin: left;
+  animation: coin-fill 520ms var(--ease-coin) both;
+  animation-delay: calc(var(--i, 0) * 140ms);
+}
 
 /* Mascot: thinking states. */
 @keyframes coin-edge-turn {
@@ -270,12 +445,36 @@
 .coin-edge-turning { transform-origin: 32px 32px; animation: coin-edge-turn 2.4s linear infinite; }
 .coin-flipping { transform-origin: 32px 32px; animation: coin-flip 1.1s var(--ease-coin) infinite; }
 
+/*
+ * Less motion, not none. When the device asks for reduced motion (Windows
+ * "Animation effects" off does this), things that travel or loop stop:
+ * cards no longer float or slide in, nothing pulses or bounces. What stays is
+ * what carries meaning without movement: fades, a line drawing in, a bar
+ * filling, a number counting to its new value.
+ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  @keyframes coin-rise {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes coin-swap {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes coin-pop {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes coin-float {
+    from, to { transform: none; }
+  }
+  @keyframes coin-dot {
+    0%, 60%, 100% { opacity: 0.25; }
+    30% { opacity: 1; }
+  }
+  .coin-pulse,
+  .coin-edge-turning,
+  .coin-flipping {
+    animation: none !important;
   }
 }

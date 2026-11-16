@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { JetBrains_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 
 const manrope = Manrope({ variable: "--font-coin", subsets: ["latin"] });
+// Small labels and live counters.
+const mono = JetBrains_Mono({ variable: "--font-coin-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Coin",
@@ -11,7 +13,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${manrope.variable} h-full antialiased`}>
+    <html lang="en" className={`${manrope.variable} ${mono.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>
     </html>
   );

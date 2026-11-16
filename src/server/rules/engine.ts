@@ -4,7 +4,8 @@ import {
   type CheckOutcome, type CheckResult, type EvaluateRules, type Proposal, type RequestEntities,
   type RuleContext, type RuleId,
 } from "../../contracts";
-import { extractRequestEntities } from "./extract";
+import { declinesAction, extractRequestEntities } from "./extract";
+import { isShortAnswer, planHasIntent, planMatchesRequest } from "./plan-intent";
 
 type Result = CheckResult & { amountFailure?: boolean };
 type Options = {
@@ -77,6 +78,22 @@ function recipientName(proposal: Etransfer, ctx: RuleContext): string {
   return ctx.contacts.find((contact) => contact.id === id)?.name.split(/\s|\(/)[0] ?? "";
 }
 
+/** Everyday words for the same kind of bill: "my phone bill" is the one saved as "Northstar Mobile". */
+const BILL_WORDS = [
+  ["mobile", "phone", "cell", "cellphone"],
+  ["internet", "wifi", "wi-fi", "broadband"],
+  ["hydro", "electricity", "electric", "power"],
+  ["rent", "landlord"],
+  ["gym", "fitness"],
+];
+
+/** A bill's own words, plus the everyday words that mean the same thing. */
+function waysToName(terms: string[]): string[] {
+  const lower = terms.map((term) => term.toLowerCase());
+  const same = BILL_WORDS.filter((group) => group.some((item) => lower.includes(item))).flat();
+  return [...terms, ...same];
+}
+
 function billNamed(proposal: Payment, ctx: RuleContext): boolean {
   const text = ctx.user_message.text;
   if (proposal.bill_id === CARD_BILL_ID) {
@@ -88,7 +105,7 @@ function billNamed(proposal: Payment, ctx: RuleContext): boolean {
   }
   const id = bill.id.replace(/^bill_/, "").replace(/_/g, " ");
   const terms = [id, ...bill.payee.split(/[^a-z]+/i).filter((part) => part.length > 3)];
-  return terms.some((term) => word(text, term));
+  return waysToName(terms).some((term) => word(text, term));
 }
 
 function fullValue(proposal: Proposal, ctx: RuleContext): number | null | undefined {
@@ -134,6 +151,9 @@ function confirmedEmail(proposal: Etransfer, ctx: RuleContext, emails: string[])
 // R0 protects against actions not authorized by the stored user message.
 function rule0Intent(proposal: Proposal, ctx: RuleContext): Result {
   const rule = "R0_intent";
+  if (ctx.origin === "plan") {
+    return planHasIntent(proposal, ctx) ? pass(rule) : fail(rule);
+  }
   const entities = extractRequestEntities(ctx.user_message.text);
   if (!entities.has_action_intent) {
     return fail(rule);
@@ -414,6 +434,9 @@ function transferRolesMatch(proposal: Transfer, text: string, accounts: string[]
 // R8 protects against changing the user's specified action details.
 function rule8MatchesRequest(proposal: Proposal, ctx: RuleContext): Result {
   const rule = "R8_matches_request";
+  if (ctx.origin === "plan") {
+    return planMatchesRequest(proposal, ctx) ? pass(rule) : fail(rule);
+  }
   const entities = extractRequestEntities(ctx.user_message.text);
   if (proposal.type !== "trade" && entities.amounts_cents.some((a) => a !== proposal.amount_cents)) {
     return fail(rule);
@@ -469,7 +492,34 @@ function toCheckResult(result: Result): CheckResult {
  * context snapshot, so the same call gives the same verdict when the action is
  * proposed, when it is approved, and again inside the executor's transaction.
  */
-export const evaluateRules: EvaluateRules = (proposal, ctx) => {
+/**
+ * The words rules 0 and 8 read. Normally the user's latest message. When Coin
+ * asked a question and the user answered it ("put some money into my TFSA",
+ * then "1000 from savings"), the request is the two together: the answer on
+ * its own names no action, and the question on its own names no amount.
+ *
+ * Only the user's own messages are ever joined, and only while the earlier one
+ * is still open (nothing from it was approved) and the answer doesn't back away.
+ */
+function requestText(ctx: RuleContext): string {
+  const latest = ctx.user_message.text;
+  const earlier = (ctx.request_thread ?? []).slice(0, -1);
+  if (extractRequestEntities(latest).has_action_intent || declinesAction(latest) || !isShortAnswer(latest)) {
+    return latest;
+  }
+  for (let i = earlier.length - 1; i >= 0; i -= 1) {
+    if (extractRequestEntities(earlier[i]).has_action_intent) {
+      return `${earlier[i]} ${latest}`;
+    }
+  }
+  return latest;
+}
+
+export const evaluateRules: EvaluateRules = (proposal, context) => {
+  let ctx = context;
+  if (context.origin !== "plan") {
+    ctx = { ...context, user_message: { ...context.user_message, text: requestText(context) } };
+  }
   const newRecipient = rule3NewRecipient(proposal, ctx);
   const checks = [
     rule0Intent(proposal, ctx),

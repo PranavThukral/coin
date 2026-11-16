@@ -83,3 +83,34 @@ describe("readEventStream", () => {
     expect(events).toEqual([{ type: "text_delta", text: "Hi" }, { type: "done" }]);
   });
 });
+
+describe("one card per action", () => {
+  const attempt = (id: string, status: ActionCard["status"], title = "Pay your credit card") =>
+    ({ action_id: id, status, type: "bill_payment", title }) as ActionCard;
+  const cardsAfter = (events: ChatEvent[]) => {
+    let state = addUserMessage(initialChat, "pay off my credit card");
+    for (const event of events) state = applyEvent(state, event);
+    return state.messages[1].parts.flatMap((part) => (part.kind === "card" ? [part.card.action_id] : []));
+  };
+
+  it("a corrected card replaces Coin's blocked first try at the same action", () => {
+    const events: ChatEvent[] = [
+      { type: "action_card", card: attempt("first", "blocked") },
+      { type: "action_card", card: attempt("second", "blocked") },
+    ];
+    expect(cardsAfter(events)).toEqual(["second"]);
+  });
+
+  it("two different actions both stay, and a card waiting for approval is never replaced", () => {
+    const different: ChatEvent[] = [
+      { type: "action_card", card: attempt("phone", "blocked", "Pay Northstar Mobile") },
+      { type: "action_card", card: attempt("internet", "proposed", "Pay Fibrenet Internet") },
+    ];
+    expect(cardsAfter(different)).toEqual(["phone", "internet"]);
+    const waiting: ChatEvent[] = [
+      { type: "action_card", card: attempt("first", "proposed") },
+      { type: "action_card", card: attempt("second", "proposed") },
+    ];
+    expect(cardsAfter(waiting)).toEqual(["first", "second"]);
+  });
+});
