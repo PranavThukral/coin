@@ -204,8 +204,10 @@ function FollowUps({ items, onPick }: { items: string[]; onPick: (text: string) 
   );
 }
 
-function Composer({ disabled, prefill, onSend }: {
+function Composer({ disabled, prefill, replay = false, onSend }: {
   disabled: boolean;
+  /** The scripted demo types here; a visitor can read but not type. */
+  replay?: boolean;
   /** A request written for the visitor to edit and send (from a quick action). */
   prefill: { text: string; id: number } | null;
   onSend: (text: string) => void;
@@ -245,12 +247,15 @@ function Composer({ disabled, prefill, onSend }: {
             }
           }}
           rows={1}
-          placeholder="Ask Coin about your money"
+          readOnly={replay}
+          data-demo="composer"
+          placeholder={replay ? "The demo types its questions here" : "Ask Coin about your money"}
           aria-label="Message Coin"
           className="coin-quiet-focus max-h-32 min-h-9 flex-1 resize-none bg-transparent py-1.5 text-[15px] font-medium outline-none placeholder:text-subtle"
         />
         <button
           type="submit"
+          data-demo="send"
           aria-label="Send"
           disabled={disabled || !draft.trim()}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition-transform active:scale-90 disabled:bg-border-strong disabled:text-surface"
@@ -258,7 +263,19 @@ function Composer({ disabled, prefill, onSend }: {
           <SendIcon className="h-4 w-4" />
         </button>
       </div>
-      <p className="mt-2 text-center text-[11px] font-semibold text-subtle">{DISCLAIMER}</p>
+      <p className="mt-2 text-center text-[11px] font-semibold text-subtle">
+        {replay ? (
+          <>
+            A replay with the real rules.{" "}
+            <a href="/app" className="font-bold text-accent-text hover:underline">
+              Try it live
+            </a>{" "}
+            to ask anything.
+          </>
+        ) : (
+          DISCLAIMER
+        )}
+      </p>
     </form>
   );
 }
@@ -345,17 +362,7 @@ export function CoinSidebar({
         )}
       </div>
 
-      {replayOnly ? (
-        <p className="border-t border-border px-5 py-4 text-sm font-semibold text-muted">
-          This is a replay with the real rules and your own copy of the data.{" "}
-          <a href="/app" className="font-extrabold text-accent-text hover:underline">
-            Try it live
-          </a>{" "}
-          to ask Coin anything.
-        </p>
-      ) : (
-        <Composer disabled={chat.busy} prefill={prefill} onSend={(text) => send(text, viewingAccountId)} />
-      )}
+      <Composer disabled={chat.busy} prefill={prefill} replay={replayOnly} onSend={(text) => send(text, viewingAccountId)} />
     </aside>
   );
 }

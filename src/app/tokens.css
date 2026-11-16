@@ -277,6 +277,15 @@
   transform-origin: left center;
 }
 
+/* The demo pointer's click: a ring that opens and fades where it pressed. */
+@keyframes coin-click {
+  from { transform: scale(0.35); opacity: 0.45; }
+  to { transform: scale(1.5); opacity: 0; }
+}
+.coin-click {
+  animation: coin-click 480ms var(--ease-coin) both;
+}
+
 /* The demo's countdown: a darker band that crosses the Next step button. */
 @keyframes coin-countdown {
   from { transform: scaleX(0); }

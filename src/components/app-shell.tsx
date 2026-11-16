@@ -30,7 +30,10 @@ function readSavedWidth(): number {
   }
 }
 
-function useSidebarWidth() {
+/** Dragging the panel this far past its narrowest hides it; the Coin button brings it back. */
+const HIDE_BELOW = MIN_WIDTH - 110;
+
+function useSidebarWidth(onHide: () => void) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
 
@@ -45,7 +48,14 @@ function useSidebarWidth() {
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const drag = (event: React.PointerEvent) => {
-    if (dragging.current) setWidth(clampWidth(window.innerWidth - event.clientX));
+    if (!dragging.current) return;
+    const wanted = window.innerWidth - event.clientX;
+    if (wanted < HIDE_BELOW) {
+      dragging.current = false;
+      onHide();
+      return;
+    }
+    setWidth(clampWidth(wanted));
   };
   const endDrag = () => {
     dragging.current = false;
@@ -170,9 +180,10 @@ function ResizeHandle({ sidebar }: { sidebar: ReturnType<typeof useSidebarWidth>
         if (event.key === "ArrowLeft") sidebar.nudge(24);
         if (event.key === "ArrowRight") sidebar.nudge(-24);
       }}
+      title="Drag to resize. Drag all the way right to hide Coin."
       className="group absolute inset-y-6 -left-3 z-10 hidden w-3 cursor-col-resize place-items-center lg:grid"
     >
-      <span className="h-12 w-1 rounded-full bg-border-strong opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+      <span className="h-12 w-1 rounded-full bg-border-strong opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
     </div>
   );
 }
@@ -182,12 +193,13 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
   const [view, setView] = useState<View>("home");
   const [prefill, setPrefill] = useState<{ text: string; id: number } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const sidebar = useSidebarWidth();
 
   const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
   const setOpenAccount = (account: AccountView | null) => setViewing(account?.id ?? null);
   const coin = useCoinChat(transport, refresh);
   const panel = useCoinOpen(coin.chat.messages.length > 0, mode);
+  const sidebar = useSidebarWidth(panel.close);
+  const type = useCallback((text: string) => setPrefill({ text, id: Math.random() }), []);
   const demo = mode === "demo";
   const openView = (next: View) => {
     setViewing(null);
@@ -217,7 +229,7 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
             />
           </div>
         </main>
-        {demo && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} />}
+        {demo && <DemoPlayer coin={coin} viewing={viewing} setViewing={setViewing} onType={type} />}
       </div>
 
       <div

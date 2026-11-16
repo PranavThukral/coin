@@ -62,6 +62,7 @@ function AccountLinks({ accounts, accountId, onAccount }: {
         <button
           key={account.id}
           type="button"
+          data-demo={`account-${account.id}`}
           onClick={() => onAccount(account.id)}
           className={`${ITEM} justify-between ${accountId === account.id ? ACTIVE : IDLE}`}
         >
@@ -90,6 +91,7 @@ export function NavRail({ view, accountId, mode, refreshKey, onView, onAccount }
             <button
               key={item.id}
               type="button"
+              data-demo={`view-${item.id}`}
               aria-current={active ? "page" : undefined}
               onClick={() => onView(item.id)}
               className={`${ITEM} ${active ? ACTIVE : IDLE}`}

@@ -209,7 +209,7 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
     const primaryClick = confirming ? () => props.onConfirmRecipient?.(email) : props.onApprove;
     return (
       <>
-        <button type="button" className={PRIMARY_BUTTON} disabled={busy || (confirming && !email)} onClick={primaryClick}>
+        <button type="button" data-demo="approve" className={PRIMARY_BUTTON} disabled={busy || (confirming && !email)} onClick={primaryClick}>
           {confirming ? "Confirm recipient" : "Approve"}
         </button>
         <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={props.onDismiss}>
@@ -221,7 +221,7 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
   const offer = offeredAmount(card);
   if (state === "offer" && offer !== null) {
     return (
-      <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => props.onUseInstead?.(offer)}>
+      <button type="button" data-demo="use-instead" className={PRIMARY_BUTTON} disabled={busy} onClick={() => props.onUseInstead?.(offer)}>
         {card.type === "bill_payment" ? "Pay this amount" : "Use this amount"}
       </button>
     );
@@ -232,7 +232,7 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
         <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={props.onUndo}>
           Undo
         </button>
-        <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={props.onExecuteNow}>
+        <button type="button" data-demo="execute-now" className={PRIMARY_BUTTON} disabled={busy} onClick={props.onExecuteNow}>
           Execute now
         </button>
       </>

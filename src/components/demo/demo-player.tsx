@@ -1,17 +1,23 @@
 "use client";
 
-// Drives the scripted demo: opens accounts, asks the demo's questions, and
-// clicks the card buttons a viewer would, with a caption saying what each
-// step proves. Everything it triggers runs through the real rules.
+// Plays the scripted demo the way a person would use Coin: a pointer moves to
+// an account and opens it, types each question into Coin's message box,
+// presses send, then presses the buttons on the card that comes back. The
+// replies are scripted; everything they trigger runs through the real rules.
+// Where the pointer has nothing to press (a phone hides the navigation), the
+// step is done directly instead.
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AccountId } from "../../contracts";
+import type { AccountId, ActionCard } from "../../contracts";
 import { DEMO_STEPS, type CardStep, type DemoStep } from "../../demo/script";
 import { latestCard } from "../coin/use-coin-chat";
 import type { CoinConversation } from "../coin/sidebar";
+import { useDemoCursor, type DemoCursor } from "./cursor";
 
 const READ_MS = 10_000;
-const BEFORE_CLICK_MS = 1_600;
+const BEFORE_CLICK_MS = 1_400;
 const SHOW_UNDO_MS = 3_000;
+const KEY_MS = 32;
+const REPLY_TIMEOUT_MS = 60_000;
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -19,23 +25,87 @@ interface Props {
   coin: CoinConversation;
   viewing: AccountId | null;
   setViewing: (account: AccountId | null) => void;
+  /** Shows text in Coin's message box, as if typed. */
+  onType: (text: string) => void;
 }
 
-async function clickCard(coin: CoinConversation, action: CardStep): Promise<void> {
-  const card = latestCard(coin.getChat());
-  if (!card) return;
-  if (action === "approve") {
-    await coin.controls.approve(card);
-    // Let the viewer see the undo ring start before skipping the wait.
-    await pause(SHOW_UNDO_MS);
-  } else if (action === "execute_now") {
-    await coin.controls.executeNow(card);
+/** Everything a step needs to act on the page. */
+interface Stage extends Omit<Props, "viewing"> {
+  cursor: DemoCursor;
+  viewing: () => AccountId | null;
+}
+
+/** Waits until `ready()` is true, looking a few times a second, and gives up quietly after `ms`. */
+async function until(ready: () => boolean, ms = 15_000): Promise<void> {
+  const deadline = Date.now() + ms;
+  while (!ready() && Date.now() < deadline) await pause(150);
+}
+
+async function openAccount(stage: Stage, account: AccountId | null): Promise<void> {
+  if (stage.viewing() === account) return;
+  const clicked = await stage.cursor.click(account ? `account-${account}` : "view-home");
+  if (!clicked) stage.setViewing(account);
+  await pause(900);
+}
+
+async function typeAndSend(stage: Stage, prompt: string): Promise<boolean> {
+  if (!(await stage.cursor.click("composer"))) return false;
+  for (let end = 1; end <= prompt.length; end += 1) {
+    stage.onType(prompt.slice(0, end));
+    await pause(KEY_MS);
+  }
+  await pause(250);
+  return stage.cursor.click("send");
+}
+
+async function ask(stage: Stage, prompt: string): Promise<void> {
+  if (!(await typeAndSend(stage, prompt))) {
+    await stage.coin.send(prompt, stage.viewing());
+    return;
+  }
+  const busy = () => stage.coin.getChat().busy;
+  await until(busy, 3_000);
+  await until(() => !busy(), REPLY_TIMEOUT_MS);
+}
+
+const CARD_BUTTON: Record<CardStep, string> = {
+  approve: "approve",
+  execute_now: "execute-now",
+  use_instead: "use-instead",
+};
+
+function pressDirectly(stage: Stage, card: ActionCard, action: CardStep): Promise<void> {
+  const controls = stage.coin.controls;
+  if (action === "approve") return controls.approve(card);
+  return action === "execute_now" ? controls.executeNow(card) : controls.useInstead(card);
+}
+
+/** Presses a button on the newest card and waits for the card to change. */
+async function pressCard(stage: Stage, action: CardStep): Promise<void> {
+  const before = latestCard(stage.coin.getChat());
+  if (!before) return;
+  if (await stage.cursor.click(CARD_BUTTON[action])) {
+    await until(() => {
+      const now = latestCard(stage.coin.getChat());
+      return now?.action_id !== before.action_id || now.status !== before.status;
+    });
   } else {
-    await coin.controls.useInstead(card);
+    await pressDirectly(stage, before, action);
+  }
+  // Let the viewer see the undo ring start before the next press skips the wait.
+  if (action === "approve") await pause(SHOW_UNDO_MS);
+}
+
+async function play(stage: Stage, step: DemoStep): Promise<void> {
+  if (step.openAccount !== undefined) await openAccount(stage, step.openAccount);
+  if (step.prompt) await ask(stage, step.prompt);
+  for (const action of step.cardSteps ?? []) {
+    await pause(BEFORE_CLICK_MS);
+    await pressCard(stage, action);
   }
 }
 
-function usePlayback({ coin, viewing, setViewing }: Props) {
+function usePlayback({ coin, viewing, setViewing, onType }: Props, cursor: DemoCursor) {
   const [index, setIndex] = useState(0);
   const [running, setRunning] = useState(false);
   // The demo moves on by itself; Pause hands the pace to the viewer.
@@ -45,40 +115,16 @@ function usePlayback({ coin, viewing, setViewing }: Props) {
     viewingRef.current = viewing;
   }, [viewing]);
 
-  const run = useCallback(
-    async (step: DemoStep) => {
-      setRunning(true);
-      if (step.openAccount !== undefined) {
-        setViewing(step.openAccount);
-        viewingRef.current = step.openAccount;
-        await pause(900);
-      }
-      if (step.prompt) await coin.send(step.prompt, viewingRef.current);
-      for (const action of step.cardSteps ?? []) {
-        await pause(BEFORE_CLICK_MS);
-        await clickCard(coin, action);
-      }
-      setRunning(false);
-    },
-    [coin, setViewing],
-  );
-
   const next = useCallback(async () => {
     if (running || index >= DEMO_STEPS.length - 1) return;
     const target = index + 1;
     setIndex(target);
-    await run(DEMO_STEPS[target]);
-  }, [index, run, running]);
+    setRunning(true);
+    await play({ coin, cursor, setViewing, onType, viewing: () => viewingRef.current }, DEMO_STEPS[target]);
+    setRunning(false);
+  }, [coin, cursor, index, onType, running, setViewing]);
 
-  // `/demo?play=1` starts playing on its own (handy for recording the video).
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      if (new URLSearchParams(window.location.search).get("play") === "1") setAutoplay(true);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  // Play all: after each step, give the viewer time to read, then continue.
+  // After each step, give the viewer time to read, then continue.
   useEffect(() => {
     if (!autoplay || running) return;
     if (index >= DEMO_STEPS.length - 1) {
@@ -115,7 +161,8 @@ const PRIMARY = `${BUTTON} bg-accent text-accent-ink shadow-coin-accent`;
 const SECONDARY = `${BUTTON} bg-border/70 text-foreground hover:bg-border`;
 
 export function DemoPlayer(props: Props) {
-  const { index, running, autoplay, setAutoplay, next } = usePlayback(props);
+  const { cursor, pointer } = useDemoCursor();
+  const { index, running, autoplay, setAutoplay, next } = usePlayback(props, cursor);
   const step = DEMO_STEPS[index];
   const finished = index >= DEMO_STEPS.length - 1 && !running;
 
@@ -124,6 +171,7 @@ export function DemoPlayer(props: Props) {
       aria-label="Scripted demo"
       className="coin-rise fixed inset-x-0 bottom-0 z-50 h-52 overflow-y-auto rounded-t-coin-lg bg-surface-raised p-5 shadow-coin-float lg:static lg:z-auto lg:mx-10 lg:mb-3 lg:h-auto lg:shrink-0 lg:overflow-visible lg:rounded-coin-lg lg:px-7"
     >
+      {pointer}
       <Progress index={index} running={running} />
       <div className="mt-4 lg:flex lg:items-center lg:justify-between lg:gap-8">
         {/* Keyed by step, so each new caption rises in. */}
