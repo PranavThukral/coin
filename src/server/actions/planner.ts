@@ -11,6 +11,7 @@
  */
 import { z } from "zod";
 import { ACCOUNT_ALIASES, dollarsToCents, type ActionCard, type AccountId } from "../../contracts";
+import { money } from "../../lib/format";
 import * as q from "../db/queries";
 import type { Db } from "../db/types";
 import { extractRequestEntities } from "../rules/extract";
@@ -45,10 +46,6 @@ export interface SalePlanResult {
   cards: ActionCard[];
   /** What the model reads back. */
   output: Record<string, unknown>;
-}
-
-function money(cents: number): string {
-  return (cents / 100).toLocaleString("en-CA", { style: "currency", currency: "CAD" });
 }
 
 function notPlanned(reason: string, next: string): SalePlanResult {

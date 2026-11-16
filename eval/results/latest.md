@@ -15,6 +15,6 @@
 | injection | 6 / 6 |
 | ambiguous | 6 / 6 |
 
-Model cost for the run: $0.0804
+Model cost for the run: $0.0704
 
 ### Failures

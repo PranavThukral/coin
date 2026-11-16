@@ -8,6 +8,7 @@ import { money, signedMoney } from "../../lib/format";
 import { ChartCard } from "../charts/chart-card";
 import { BackIcon } from "../ui/icons";
 import { AnimatedMoney } from "../ui/motion";
+import { useFetched } from "../ui/use-fetched";
 import { SectionTitle, stagger } from "./pieces";
 
 const TICK_MS = 1_800;
@@ -61,21 +62,6 @@ const ACCOUNT_NAME: Record<string, string> = {
 };
 
 const KIND: Record<string, string> = { stock: "Stock", etf: "Index fund (ETF)" };
-
-function useSecurity(ticker: string, refreshKey: number): SecurityPayload | null {
-  const [data, setData] = useState<SecurityPayload | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/securities/${encodeURIComponent(ticker)}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => !cancelled && payload && setData(payload))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [ticker, refreshKey]);
-  return data;
-}
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -162,7 +148,7 @@ export function SecurityDetail({ ticker, refreshKey, backLabel = "Back to the ac
   /** Hands a question about this security to Coin. */
   onAsk?: (question: string) => void;
 }) {
-  const data = useSecurity(ticker, refreshKey);
+  const data = useFetched<SecurityPayload>(`/api/securities/${encodeURIComponent(ticker)}`, refreshKey);
   if (!data) return <div className="h-[30rem] animate-pulse rounded-coin-lg bg-surface shadow-coin" />;
   const { security } = data;
   return (

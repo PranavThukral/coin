@@ -186,8 +186,10 @@ export function goalPlan(targetCents: number, monthlySavingCents: number, today:
 
 export async function loadCashFlow(db: Tx, sid: string, months: number) {
   const [transactions, session] = await Promise.all([q.transactions(db, sid), q.sessionInfo(db, sid)]);
-  const flows = cashFlowByMonth(transactions, session.today_date, months);
-  return { months: flows, typical_month: typicalMonth(flows) };
+  const today = session.today_date;
+  // "Typical" always means the same recent complete months, however far back the caller looks.
+  const typical = typicalMonth(cashFlowByMonth(transactions, today, TYPICAL_MONTHS + 1));
+  return { months: cashFlowByMonth(transactions, today, months), typical_month: typical };
 }
 
 export async function loadCategoryPace(db: Tx, sid: string) {
@@ -243,7 +245,8 @@ function balanceOn(account: Account, transactions: Transaction[], date: string):
 /** What moved net worth over the last `months`: cash, market gains, contributions, card debt. */
 export async function loadNetWorthChange(db: Tx, sid: string, months: number) {
   const today = (await q.sessionInfo(db, sid)).today_date;
-  const from = clampToHistory(addDays(today, -months * 30), today);
+  // Twelve months is the same 365 days the net worth chart draws.
+  const from = clampToHistory(addDays(today, -Math.round((months * 365) / 12)), today);
   const [accounts, transactions, startValue, endValue] = await Promise.all([
     q.accounts(db, sid), q.transactions(db, sid),
     portfolioSeries(db, sid, from, from, null, "month"), portfolioSeries(db, sid, today, today, null, "month"),

@@ -7,6 +7,7 @@
 import type { ActionCard } from "../../contracts";
 import { money } from "../../lib/format";
 import { AlertIcon, CheckIcon, ClockIcon, CrossIcon, UndoIcon } from "../ui/icons";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../ui/buttons";
 import { UndoRing } from "../ui/live-bits";
 
 export interface PlanHandlers {
@@ -62,18 +63,15 @@ function Step({ card, index }: { card: ActionCard; index: number }) {
   );
 }
 
-const BUTTON = "min-w-[7.5rem] flex-1 whitespace-nowrap rounded-full px-5 py-2.5 text-center text-sm font-extrabold transition-transform active:scale-[0.97] disabled:opacity-50";
-const PRIMARY = `${BUTTON} bg-accent text-accent-ink shadow-coin-accent hover:bg-accent-strong`;
-const SECONDARY = `${BUTTON} bg-border/70 text-foreground hover:bg-border`;
 
 function PlanActions({ state, busy, handlers }: { state: PlanState; busy: boolean; handlers: PlanHandlers }) {
   if (state === "proposed") {
     return (
       <>
-        <button type="button" className={PRIMARY} disabled={busy} onClick={handlers.onApprove}>
+        <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={handlers.onApprove}>
           Approve plan
         </button>
-        <button type="button" className={SECONDARY} disabled={busy} onClick={handlers.onDismiss}>
+        <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={handlers.onDismiss}>
           Dismiss
         </button>
       </>
@@ -82,10 +80,10 @@ function PlanActions({ state, busy, handlers }: { state: PlanState; busy: boolea
   if (state === "pending_undo") {
     return (
       <>
-        <button type="button" className={SECONDARY} disabled={busy} onClick={handlers.onUndo}>
+        <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={handlers.onUndo}>
           Undo
         </button>
-        <button type="button" className={PRIMARY} disabled={busy} onClick={handlers.onExecuteNow}>
+        <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={handlers.onExecuteNow}>
           Execute now
         </button>
       </>

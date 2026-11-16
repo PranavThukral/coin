@@ -57,6 +57,17 @@ function addStep(steps: string[], label: string): string[] {
   return steps.at(-1) === label ? steps : [...steps, label];
 }
 
+/**
+ * A new card joins the reply. If Coin's earlier try at the same action in this
+ * reply was blocked (it proposed before it had the right amount, then corrected
+ * itself), the new card takes its place: the user sees one card per action.
+ */
+function addCard(parts: MessagePart[], card: ActionCard): MessagePart[] {
+  const sameAction = (part: MessagePart) =>
+    part.kind === "card" && part.card.status === "blocked" && part.card.type === card.type && part.card.title === card.title;
+  return [...parts.filter((part) => !sameAction(part)), { kind: "card", card }];
+}
+
 /** Fold one server event into the conversation. Pure, so it is easy to test. */
 export function applyEvent(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
@@ -69,7 +80,7 @@ export function applyEvent(state: ChatState, event: ChatEvent): ChatState {
     case "chart":
       return updateLastCoin(state, (m) => ({ ...m, parts: [...m.parts, { kind: "chart", chart: event.chart }] }));
     case "action_card":
-      return updateLastCoin(state, (m) => ({ ...m, parts: [...m.parts, { kind: "card", card: event.card }] }));
+      return updateLastCoin(state, (m) => ({ ...m, parts: addCard(m.parts, event.card) }));
     case "suggestions":
       return updateLastCoin(state, (m) => ({ ...m, suggestions: event.items }));
     case "error":

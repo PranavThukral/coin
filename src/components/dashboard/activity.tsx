@@ -2,11 +2,12 @@
 
 // Activity: every recent transaction across the accounts, searchable, with
 // this month's money in and out summed above it.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { AccountView, Transaction, TxnKind } from "../../contracts";
 import { unwrap, type Wrapped } from "../../lib/api";
 import { displayName, shortDate, signedMoney } from "../../lib/format";
 import { SearchGlyph } from "../ui/icons";
+import { useFetched } from "../ui/use-fetched";
 import { stagger } from "./pieces";
 
 interface ActivityPayload {
@@ -18,21 +19,6 @@ interface ActivityPayload {
 /** Money arriving from outside, and money leaving for good. Moves between your own accounts are neither. */
 const MONEY_IN: TxnKind[] = ["income", "refund", "dividend", "interest", "etransfer_in"];
 const MONEY_OUT: TxnKind[] = ["purchase", "bill_payment", "etransfer_out"];
-
-function useActivity(refreshKey: number): ActivityPayload | null {
-  const [data, setData] = useState<ActivityPayload | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/activity", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => !cancelled && payload && setData(payload))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
-  return data;
-}
 
 function monthTotals(transactions: Transaction[], today: string) {
   const month = today.slice(0, 7);
@@ -137,7 +123,7 @@ function matches(transaction: Transaction, account: string, query: string): bool
 }
 
 export function ActivityView({ refreshKey }: { refreshKey: number }) {
-  const data = useActivity(refreshKey);
+  const data = useFetched<ActivityPayload>("/api/activity", refreshKey);
   const [account, setAccount] = useState("");
   const [query, setQuery] = useState("");
   const transactions = useMemo(() => (data ? unwrap(data.transactions) : []), [data]);

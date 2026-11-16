@@ -108,9 +108,9 @@ describe("paying the credit card", () => {
 
   it("the prompt names bill_card and tells the model to propose what rules will block", () => {
     const prompt = buildSystemPrompt({ firstName: "Jordan", today: "2026-11-14", viewingAccountName: null });
-    expect(prompt).toContain('always type "bill_payment" with bill_id "bill_card"');
-    expect(prompt).toContain("Propose even when you can tell a rule will block it: an unsaved bill");
-    expect(prompt).toContain("Never describe it as an error, a failure or a tool problem.");
+    expect(prompt).toContain('type "bill_payment" with bill_id "bill_card"');
+    expect(prompt).toContain("propose it exactly as asked, even if you expect a limit to stop it");
+    expect(prompt).toContain("Propose only when the user asks for an action.");
     expect(prompt).toContain("- NRTH.CX: Northwind Robotics");
   });
 });
@@ -274,11 +274,11 @@ describe("insight tools", () => {
     expect(result.result.months).toHaveLength(3);
   });
 
-  it("counts those charts against the per-reply limit", async () => {
+  it("shows the same chart once, however many times the model asks for it", async () => {
     const ask = (id: string) => call("get_cash_flow", { months: 2, chart: true }, id);
     const model = fakeModel([[ask("c1"), ask("c2"), ask("c3"), ask("c4")], []]);
     const events = await send("Show me my cash flow four times", model, await fixture.newSession());
-    expect(events.filter((event) => event.type === "chart")).toHaveLength(3);
+    expect(events.filter((event) => event.type === "chart")).toHaveLength(1);
   });
 
   it("names bad arguments so the model can correct them", async () => {

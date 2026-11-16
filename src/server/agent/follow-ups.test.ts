@@ -2,24 +2,25 @@ import { describe, expect, it } from "vitest";
 import { extractRequestEntities } from "../rules/extract";
 import { followUps } from "./follow-ups";
 
-const affordability = (shortfall: number, savings: number) => ({
+const affordability = (requests: string[]) => ({
   name: "check_affordability",
-  result: { untrusted_data_note: "data", data: { shortfall_cents: shortfall, savings_balance_cents: savings } },
+  result: { untrusted_data_note: "data", data: { suggested_requests: requests } },
 });
 
 describe("followUps", () => {
-  it("offers to cover a shortfall from savings, rounded up to a round amount", () => {
-    const [first] = followUps([affordability(80_194, 2_450_000)], "can I afford a laptop");
+  it("puts a request a tool worked out from balances first", () => {
+    const [first] = followUps([affordability(["Move $900 from savings to chequing"])], "can I afford a laptop");
     expect(first).toBe("Move $900 from savings to chequing");
   });
 
-  it("doesn't offer a transfer savings can't cover, or when nothing is short", () => {
-    expect(followUps([affordability(80_194, 50_000)], "x").join(" ")).not.toContain("Move");
-    expect(followUps([affordability(0, 2_450_000)], "x").join(" ")).not.toContain("Move");
+  it("offers only questions when no tool worked out a request", () => {
+    expect(followUps([affordability([])], "x").join(" ")).not.toContain("Move");
   });
 
   it("offers nothing when a card or plan is already on screen", () => {
     expect(followUps([{ name: "propose_action", result: {} }], "pay hydro")).toEqual([]);
+    const rest = { name: "plan_card_payoff", result: { suggested_requests: ["Move $2,600 from savings to chequing"] } };
+    expect(followUps([{ name: "propose_action", result: {} }, rest], "pay off my card")).toEqual(["Move $2,600 from savings to chequing"]);
     expect(followUps([{ name: "get_holdings", result: {} }, { name: "plan_sale", result: {} }], "sell")).toEqual([]);
   });
 

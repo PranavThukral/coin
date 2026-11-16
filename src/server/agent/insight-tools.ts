@@ -23,6 +23,7 @@ import {
   type GoalPlan,
   type MonthFlow,
 } from "../tools/insights";
+import { loadCardPayoff } from "../tools/payoff";
 import { recurringCharges } from "../tools/recurring";
 
 export const InsightToolInputs = {
@@ -32,6 +33,7 @@ export const InsightToolInputs = {
   get_subscriptions: z.object({}),
   plan_savings_goal: z.object({ target_cad: z.number().positive().max(10_000_000), chart: z.boolean() }),
   explain_net_worth_change: z.object({ months: z.int().min(1).max(24) }),
+  plan_card_payoff: z.object({}),
 } as const;
 export type InsightToolName = keyof typeof InsightToolInputs;
 
@@ -47,6 +49,10 @@ export const INSIGHT_TOOL_DESCRIPTIONS: Record<InsightToolName, string> = {
     "How long it takes to save a target amount at the typical monthly saving, and the month it is reached. chart: true also shows the path.",
   explain_net_worth_change:
     "What moved net worth over the last N months: cash, investment contributions vs market gains, and card debt.",
+  plan_card_payoff:
+    "The real ways to pay the credit card statement, checked against what each account can afford: wait for payday, "
+    + "move money from savings, pay part now, or sell investments, with the amounts and what each leaves. "
+    + "Use for any 'how do I pay my card' question and before suggesting where a card payment should come from.",
 };
 
 export function isInsightTool(name: string): name is InsightToolName {
@@ -141,5 +147,8 @@ export async function runInsightTool(db: Tx, sid: string, name: InsightToolName,
       const p = InsightToolInputs.explain_net_worth_change.parse(input);
       return { output: await loadNetWorthChange(db, sid, p.months), chart: null };
     }
+    case "plan_card_payoff":
+      InsightToolInputs.plan_card_payoff.parse(input);
+      return { output: await loadCardPayoff(db, sid), chart: null };
   }
 }

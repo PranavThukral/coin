@@ -12,6 +12,7 @@ import { useState } from "react";
 import type { ActionCard, CheckResult } from "../../contracts";
 import { money } from "../../lib/format";
 import { AlertIcon, ArrowIcon, CheckIcon, ClockIcon, CrossIcon, UndoIcon } from "../ui/icons";
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "../ui/buttons";
 import { UndoRing } from "../ui/live-bits";
 
 export interface CardHandlers {
@@ -199,10 +200,6 @@ function RecipientConfirmation({ name, onEmail }: { name: string; onEmail: (emai
   );
 }
 
-// Buttons share the row evenly and wrap onto their own lines when the panel is narrow.
-const BUTTON = "min-w-[7.5rem] flex-1 whitespace-nowrap rounded-full px-5 py-2.5 text-center text-sm font-extrabold transition-transform active:scale-[0.97] disabled:opacity-50";
-const PRIMARY = `${BUTTON} bg-accent text-accent-ink shadow-coin-accent hover:bg-accent-strong`;
-const SECONDARY = `${BUTTON} bg-border/70 text-foreground hover:bg-border`;
 
 function Actions(props: { card: ActionCard; state: CardState; email: string; busy: boolean } & CardHandlers) {
   const { card, state, email, busy } = props;
@@ -212,10 +209,10 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
     const primaryClick = confirming ? () => props.onConfirmRecipient?.(email) : props.onApprove;
     return (
       <>
-        <button type="button" className={PRIMARY} disabled={busy || (confirming && !email)} onClick={primaryClick}>
+        <button type="button" className={PRIMARY_BUTTON} disabled={busy || (confirming && !email)} onClick={primaryClick}>
           {confirming ? "Confirm recipient" : "Approve"}
         </button>
-        <button type="button" className={SECONDARY} disabled={busy} onClick={props.onDismiss}>
+        <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={props.onDismiss}>
           Dismiss
         </button>
       </>
@@ -224,7 +221,7 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
   const offer = offeredAmount(card);
   if (state === "offer" && offer !== null) {
     return (
-      <button type="button" className={PRIMARY} disabled={busy} onClick={() => props.onUseInstead?.(offer)}>
+      <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => props.onUseInstead?.(offer)}>
         {card.type === "bill_payment" ? "Pay this amount" : "Use this amount"}
       </button>
     );
@@ -232,10 +229,10 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
   if (state === "pending_undo") {
     return (
       <>
-        <button type="button" className={SECONDARY} disabled={busy} onClick={props.onUndo}>
+        <button type="button" className={SECONDARY_BUTTON} disabled={busy} onClick={props.onUndo}>
           Undo
         </button>
-        <button type="button" className={PRIMARY} disabled={busy} onClick={props.onExecuteNow}>
+        <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={props.onExecuteNow}>
           Execute now
         </button>
       </>

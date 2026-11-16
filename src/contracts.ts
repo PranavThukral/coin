@@ -857,7 +857,7 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   get_transactions: "Search transactions. Use summarize_spending for totals instead of adding these up yourself.",
   summarize_spending: "Code-computed spending totals for a date range, grouped. Use for any totals.",
   compare_spending: "Code-computed spending in period A vs period B with deltas.",
-  find_recurring_changes: "Recurring charges whose price or frequency changed, and new or stopped ones.",
+  find_recurring_changes: "Recurring charges whose price or frequency changed, and new or stopped ones. The tool for 'did anything get more expensive' and 'what changed'.",
   get_holdings: "Holdings with quantity, cost, market value, gain and weight of total portfolio.",
   get_portfolio_performance: "Portfolio value over time, contributions, and return for a range.",
   get_price_history: "Daily closes for one ticker.",
@@ -906,6 +906,8 @@ export interface AffordabilityResult {
   shortfall_cents: number;
   /** What is in savings, which could cover a shortfall with a transfer. */
   savings_balance_cents: number;
+  /** One-tap requests that would make it work, built from balances (empty when nothing is short). */
+  suggested_requests: string[];
 }
 
 /** Hard ceilings on one agent turn. */

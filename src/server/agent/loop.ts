@@ -12,6 +12,8 @@ import type { Db } from "../db/types";
 import { AppError } from "../errors";
 import * as q from "../db/queries";
 import { planSale } from "../actions/planner";
+import { CARD_BILL_ID, type ActionCard } from "../../contracts";
+import { loadCardPayoff } from "../tools/payoff";
 import { buildChart } from "../tools/charts";
 import { chartSummaryForModel } from "./chart-summary";
 import { followUps, type ToolUse } from "./follow-ups";
@@ -57,6 +59,7 @@ const STATUS_LABELS: Partial<Record<ToolName | InsightToolName | "plan_sale", st
   get_subscriptions: "Finding your subscriptions\u2026",
   plan_savings_goal: "Working out your goal\u2026",
   explain_net_worth_change: "Working out what moved your net worth\u2026",
+  plan_card_payoff: "Working out how to pay your card\u2026",
   propose_action: "Checking your action\u2026",
   render_chart: "Building your chart\u2026",
   get_transactions: "Reading your transactions\u2026",
@@ -111,7 +114,22 @@ async function propose(options: Options, args: unknown, counts: Counts): Promise
   }
   counts.proposals += 1;
   options.emit({ type: "action_card", card });
-  return proposalResultForModel(card);
+  const result = proposalResultForModel(card);
+  if (isCardPaymentThatDoesntFit(card, repaired)) {
+    // The card offers what chequing can spare; these are the ways to cover the rest.
+    const payoff = await loadCardPayoff(options.db, options.sessionId);
+    const others = payoff.ways.filter((way) => way.id !== "pay_part_now");
+    counts.uses.push({ name: "plan_card_payoff", result: { suggested_requests: others.flatMap((way) => way.request ?? []) } });
+    result.ways_to_cover_the_rest = others.map((way) => way.summary);
+    result.watch_out = payoff.watch_out;
+  }
+  return result;
+}
+
+/** A payment to the user's own credit card that was held back only because of the amount. */
+function isCardPaymentThatDoesntFit(card: ActionCard, proposal: unknown): boolean {
+  const billId = (proposal as { bill_id?: unknown } | null)?.bill_id;
+  return billId === CARD_BILL_ID && card.status === "blocked" && card.max_passing_amount_cents !== null;
 }
 
 async function drawChart(options: Options, args: unknown, counts: Counts): Promise<unknown> {
@@ -230,8 +248,13 @@ function paragraphEmitter(emit: Options["emit"]) {
 /** Wraps emit to remember whether the user has been shown anything yet. */
 function visibleOutputTracker(emit: Options["emit"]) {
   let shown = false;
+  const charted = new Set<string>();
   return {
     emit(event: ChatEvent) {
+      if (event.type === "chart") {
+        if (charted.has(event.chart.source)) return;
+        charted.add(event.chart.source);
+      }
       if (event.type === "text_delta" || event.type === "chart" || event.type === "action_card") shown = true;
       emit(event);
     },

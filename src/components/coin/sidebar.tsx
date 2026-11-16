@@ -44,11 +44,28 @@ function withBold(paragraph: string): React.ReactNode[] {
   );
 }
 
+const NUMBERED = /^(\d+)\.\s+(.*)$/;
+
+/** One line of Coin's reply. A numbered line ("1. Wait for payday...") is an option the user can choose. */
+function Line({ line }: { line: string }) {
+  const numbered = NUMBERED.exec(line);
+  if (!numbered) return <p>{withBold(line)}</p>;
+  return (
+    <p className="flex gap-3 rounded-coin-sm bg-surface-soft px-3 py-2.5">
+      <span className="money grid h-5 w-5 shrink-0 place-items-center rounded-full bg-accent-soft text-[11px] font-bold text-accent-text">
+        {numbered[1]}
+      </span>
+      <span className="min-w-0">{withBold(numbered[2])}</span>
+    </p>
+  );
+}
+
 function CoinText({ text }: { text: string }) {
+  const lines = text.split(/\n+/).filter((line) => line.trim().length > 0);
   return (
     <div className="coin-rise space-y-2 text-[15px] font-medium leading-relaxed">
-      {text.split(/\n{2,}/).map((paragraph, i) => (
-        <p key={i}>{withBold(paragraph)}</p>
+      {lines.map((line, i) => (
+        <Line key={i} line={line.trim()} />
       ))}
     </div>
   );

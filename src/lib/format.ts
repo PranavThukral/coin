@@ -20,7 +20,16 @@ export function compactMoney(cents: number): string {
   return CAD_ROUND.format(dollars);
 }
 
-/** "Nov 18" from "2026-11-18". */
+/** The next $100 up: a round amount a person would pick. */
+export function roundUpTo100(cents: number): number {
+  return Math.ceil(cents / 10_000) * 10_000;
+}
+
+/** "$2,600": a round amount written without cents. */
+export function wholeDollars(cents: number): string {
+  return CAD_ROUND.format(cents / 100);
+}
+
 /** A ledger name for display: one that arrives in capitals is shown as ordinary words. Tickers keep theirs. */
 export function displayName(name: string): string {
   const shouting = name === name.toUpperCase() && /[A-Z]{4,}/.test(name) && !name.includes(".");
@@ -28,6 +37,7 @@ export function displayName(name: string): string {
   return name.charAt(0) + name.slice(1).toLowerCase();
 }
 
+/** "Nov 18" from "2026-11-18". */
 export function shortDate(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00Z`);
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(d);

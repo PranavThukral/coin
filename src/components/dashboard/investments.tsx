@@ -2,11 +2,12 @@
 
 // Investments: everything invested as one figure and one line, how it splits
 // by holding and by account, and every position. A position opens its security.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AccountView, ChartPayload, HoldingView } from "../../contracts";
 import { money } from "../../lib/format";
 import { ChartCard } from "../charts/chart-card";
 import { AnimatedMoney } from "../ui/motion";
+import { useFetched } from "../ui/use-fetched";
 import { ChangePill, SectionTitle, stagger } from "./pieces";
 import { SecurityDetail } from "./security-detail";
 
@@ -16,21 +17,6 @@ interface InvestmentsPayload {
   value: ChartPayload;
   by_holding: ChartPayload;
   by_account: ChartPayload;
-}
-
-function useInvestments(refreshKey: number): InvestmentsPayload | null {
-  const [data, setData] = useState<InvestmentsPayload | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/investments", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => !cancelled && payload && setData(payload))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
-  return data;
 }
 
 function Hero({ data }: { data: InvestmentsPayload }) {
@@ -125,7 +111,7 @@ function Positions({ data, onOpen }: { data: InvestmentsPayload; onOpen: (ticker
 }
 
 export function InvestmentsView({ refreshKey, onAsk }: { refreshKey: number; onAsk?: (question: string) => void }) {
-  const data = useInvestments(refreshKey);
+  const data = useFetched<InvestmentsPayload>("/api/investments", refreshKey);
   const [ticker, setTicker] = useState<string | null>(null);
 
   if (ticker) {

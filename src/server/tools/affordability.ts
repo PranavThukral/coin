@@ -1,4 +1,5 @@
 import { addDays, daysBetween, PERSONA, RULE_LIMITS, type AffordabilityResult } from "../../contracts";
+import { roundUpTo100, wholeDollars } from "../../lib/format";
 import type { Tx } from "../db/types";
 import * as q from "../db/queries";
 import { cashflow } from "./data";
@@ -36,10 +37,14 @@ export async function checkAffordability(
     verdict = "tight";
   }
   const savings = accounts.find(a => a.id === "acc_hisa")?.balance_cents ?? 0;
+  const shortfall = Math.max(0, RULE_LIMITS.min_buffer_cents - lowest);
+  const cover = roundUpTo100(shortfall);
+  const savingsCovers = shortfall > 0 && savings >= cover;
   return {
     verdict, lowest_balance_cents: lowest, lowest_balance_date: lowestDate,
     max_comfortable_cents: Math.max(0, available), upcoming_considered: events,
-    shortfall_cents: Math.max(0, RULE_LIMITS.min_buffer_cents - lowest),
+    shortfall_cents: shortfall,
     savings_balance_cents: savings,
+    suggested_requests: savingsCovers ? [`Move ${wholeDollars(cover)} from savings to chequing`] : [],
   };
 }

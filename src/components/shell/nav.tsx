@@ -3,12 +3,12 @@
 // The app's navigation: the views down the left, then every account with its
 // balance. On a phone it becomes a row of tabs across the top.
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import type { AccountId, AccountView } from "../../contracts";
-import { api } from "../../lib/api";
+import type { DashboardPayload } from "../../lib/api";
 import { money } from "../../lib/format";
 import { Mascot } from "../coin/mascot";
 import { ActivityGlyph, HomeGlyph, TrendGlyph } from "../ui/icons";
+import { useFetched } from "../ui/use-fetched";
 
 export type View = "home" | "activity" | "investments";
 
@@ -29,21 +29,6 @@ interface Props {
 
 const ORDER = ["chequing", "hisa", "tfsa", "rrsp", "non_registered", "credit_card"];
 const byKind = (a: AccountView, b: AccountView) => ORDER.indexOf(a.type) - ORDER.indexOf(b.type);
-
-function useAccounts(refreshKey: number): AccountView[] {
-  const [accounts, setAccounts] = useState<AccountView[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .dashboard()
-      .then((payload) => !cancelled && setAccounts([...payload.accounts].sort(byKind)))
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
-  return accounts;
-}
 
 const ITEM = "flex h-9 w-full items-center gap-2.5 rounded-coin-sm px-2.5 text-sm transition-colors";
 const ACTIVE = "bg-surface-soft font-bold text-foreground";
@@ -90,7 +75,8 @@ function AccountLinks({ accounts, accountId, onAccount }: {
 
 /** Desktop: the full rail. */
 export function NavRail({ view, accountId, mode, refreshKey, onView, onAccount }: Props) {
-  const accounts = useAccounts(refreshKey);
+  const dashboard = useFetched<DashboardPayload>("/api/dashboard", refreshKey);
+  const accounts = [...(dashboard?.accounts ?? [])].sort(byKind);
   return (
     <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface/50 px-3 py-4 lg:flex" aria-label="Navigation">
       <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-5">
