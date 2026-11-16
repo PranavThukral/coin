@@ -132,3 +132,43 @@ export function CardGlyph() {
     </Svg>
   );
 }
+
+/** Navigation: home. */
+export function HomeGlyph() {
+  return (
+    <Svg className={GLYPH}>
+      <path d="M2.5 7.25L8 2.75l5.5 4.5v5.5a.75.75 0 01-.75.75H3.25a.75.75 0 01-.75-.75z" />
+      <path d="M6.25 13.5v-3.75h3.5v3.75" />
+    </Svg>
+  );
+}
+
+/** Navigation: activity, as two arrows passing. */
+export function ActivityGlyph() {
+  return (
+    <Svg className={GLYPH}>
+      <path d="M2.5 5.5h10M10 3l2.5 2.5L10 8" />
+      <path d="M13.5 10.5h-10M6 8l-2.5 2.5L6 13" />
+    </Svg>
+  );
+}
+
+/** A bill: a page with lines. */
+export function BillGlyph() {
+  return (
+    <Svg className={GLYPH}>
+      <path d="M4 2.25h8v11.5l-2-1.25-2 1.25-2-1.25-2 1.25z" />
+      <path d="M6.25 5.75h3.5M6.25 8.25h3.5" />
+    </Svg>
+  );
+}
+
+/** Search. */
+export function SearchGlyph() {
+  return (
+    <Svg className={GLYPH}>
+      <circle cx="7" cy="7" r="4.25" />
+      <path d="M10.25 10.25L13.5 13.5" />
+    </Svg>
+  );
+}

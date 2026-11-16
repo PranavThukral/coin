@@ -7,6 +7,10 @@ import { money } from "../../lib/format";
 import { ChartCard } from "../charts/chart-card";
 import { BackIcon } from "../ui/icons";
 import { AnimatedMoney } from "../ui/motion";
+import type { View } from "../shell/nav";
+import { ActivityView } from "./activity";
+import { HomeHeader } from "./home-header";
+import { InvestmentsView } from "./investments";
 import { NetWorthHero } from "./net-worth-hero";
 import { SecurityDetail } from "./security-detail";
 import { AccountList, ChangePill, HeroStats, SectionTitle, stagger, totalsOf, TransactionList, UpcomingList } from "./pieces";
@@ -15,7 +19,7 @@ function Loading() {
   return (
     <div className="space-y-8" aria-label="Loading your accounts">
       <div className="h-[30rem] animate-pulse rounded-coin-lg bg-surface shadow-coin" />
-      <div className="grid gap-8 xl:grid-cols-2">
+      <div className="grid gap-8 @4xl:grid-cols-2">
         <div className="h-80 animate-pulse rounded-coin bg-surface shadow-coin" />
         <div className="h-80 animate-pulse rounded-coin bg-surface shadow-coin" />
       </div>
@@ -23,20 +27,22 @@ function Loading() {
   );
 }
 
-function Overview({ data, refreshKey, onOpen }: {
+function Overview({ data, refreshKey, onOpen, onCompose }: {
   data: DashboardPayload;
   refreshKey: number;
   onOpen: (account: AccountView) => void;
+  onCompose?: (request: string) => void;
 }) {
   const totals = totalsOf(data.accounts);
   return (
-    <div className="space-y-10">
+    <div className="space-y-8">
+      <HomeHeader today={data.today} onCompose={onCompose} />
       <NetWorthHero netWorthCents={totals.netWorth} refreshKey={refreshKey}>
         <HeroStats totals={totals} />
       </NetWorthHero>
-      <div className="grid items-start gap-x-8 gap-y-10 xl:grid-cols-2">
+      <div className="grid items-start gap-x-6 gap-y-8 @4xl:grid-cols-2">
         <AccountList accounts={data.accounts} gains={data.account_gains ?? {}} today={data.today} onOpen={onOpen} />
-        <div className="space-y-10">
+        <div className="space-y-8">
           <UpcomingList events={unwrap(data.upcoming)} today={data.today} />
           <TransactionList transactions={unwrap(data.recent_transactions)} title="Recent activity" />
         </div>
@@ -192,8 +198,13 @@ export function Dashboard({
   openAccountId,
   onOpenAccount,
   refreshKey,
+  view,
   onAsk,
+  onCompose,
 }: {
+  view: View;
+  /** Puts a request in Coin's message box (Home's quick actions). */
+  onCompose?: (request: string) => void;
   openAccountId: string | null;
   onOpenAccount: (account: AccountView | null) => void;
   refreshKey: number;
@@ -221,6 +232,8 @@ export function Dashboard({
   if (openAccountId) {
     return <AccountDetail accountId={openAccountId} refreshKey={refreshKey} onBack={() => onOpenAccount(null)} onAsk={onAsk} />;
   }
+  if (view === "activity") return <ActivityView refreshKey={refreshKey} />;
+  if (view === "investments") return <InvestmentsView refreshKey={refreshKey} onAsk={onAsk} />;
   if (!data) return <Loading />;
-  return <Overview data={data} refreshKey={refreshKey} onOpen={onOpenAccount} />;
+  return <Overview data={data} refreshKey={refreshKey} onOpen={onOpenAccount} onCompose={onCompose} />;
 }

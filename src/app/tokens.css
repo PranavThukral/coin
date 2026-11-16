@@ -75,11 +75,14 @@
   --canvas-glow:
     radial-gradient(1100px 560px at 12% -8%, rgba(43, 68, 255, 0.1), transparent 62%),
     radial-gradient(900px 520px at 96% -4%, rgba(240, 174, 27, 0.09), transparent 60%);
-  --shadow-card: 0 0 0 1px rgba(12, 14, 19, 0.05), 0 1px 2px rgba(12, 14, 19, 0.05), 0 10px 28px -14px rgba(12, 14, 19, 0.14);
-  --shadow-float:
+  /* In the app, a surface is drawn by a hairline and a whisper of shadow, not a glow. */
+  --shadow-card: 0 0 0 1px rgba(12, 14, 19, 0.07), 0 1px 2px rgba(12, 14, 19, 0.04);
+  --shadow-float: 0 0 0 1px rgba(12, 14, 19, 0.08), 0 2px 6px -2px rgba(12, 14, 19, 0.06), 0 16px 32px -20px rgba(12, 14, 19, 0.16);
+  --shadow-accent: 0 1px 2px rgba(12, 14, 19, 0.14), 0 4px 12px -6px rgba(43, 68, 255, 0.5);
+  /* The landing page's cards float higher. */
+  --shadow-landing:
     0 0 0 1px rgba(12, 14, 19, 0.05), 0 2px 4px rgba(12, 14, 19, 0.04), 0 18px 36px -16px rgba(12, 14, 19, 0.2),
     0 44px 90px -34px rgba(27, 41, 140, 0.3);
-  --shadow-accent: 0 1px 2px rgba(12, 14, 19, 0.12), 0 10px 24px -8px rgba(43, 68, 255, 0.55);
 }
 
 [data-theme="dark"] {
@@ -134,10 +137,9 @@
     radial-gradient(900px 560px at 98% -6%, rgba(150, 96, 255, 0.16), transparent 62%),
     radial-gradient(1000px 620px at 78% 108%, rgba(34, 170, 190, 0.11), transparent 64%),
     radial-gradient(700px 480px at -6% 96%, rgba(77, 99, 255, 0.12), transparent 62%);
-  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px -12px rgba(0, 0, 0, 0.7);
-  --shadow-float:
-    0 0 0 1px rgba(255, 255, 255, 0.08), 0 2px 4px rgba(0, 0, 0, 0.4), 0 18px 36px -14px rgba(0, 0, 0, 0.75),
-    0 44px 90px -30px rgba(0, 0, 0, 0.85);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 16px 32px -18px rgba(0, 0, 0, 0.7);
+  --shadow-landing: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.75), 0 44px 90px -30px rgba(0, 0, 0, 0.85);
   --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px -8px rgba(77, 99, 255, 0.6);
 }
 
@@ -195,10 +197,9 @@
       radial-gradient(900px 560px at 98% -6%, rgba(150, 96, 255, 0.16), transparent 62%),
       radial-gradient(1000px 620px at 78% 108%, rgba(34, 170, 190, 0.11), transparent 64%),
       radial-gradient(700px 480px at -6% 96%, rgba(77, 99, 255, 0.12), transparent 62%);
-    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px -12px rgba(0, 0, 0, 0.7);
-    --shadow-float:
-      0 0 0 1px rgba(255, 255, 255, 0.08), 0 2px 4px rgba(0, 0, 0, 0.4), 0 18px 36px -14px rgba(0, 0, 0, 0.75),
-      0 44px 90px -30px rgba(0, 0, 0, 0.85);
+    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 16px 32px -18px rgba(0, 0, 0, 0.7);
+  --shadow-landing: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 18px 36px -14px rgba(0, 0, 0, 0.75), 0 44px 90px -30px rgba(0, 0, 0, 0.85);
     --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px -8px rgba(77, 99, 255, 0.6);
   }
 }
@@ -244,12 +245,14 @@
   --font-sans: var(--font-coin), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-coin-mono), ui-monospace, "SF Mono", Menlo, monospace;
   /* Weight is used sparingly: the heaviest text is a firm bold, not a shout. */
-  --font-weight-extrabold: 700;
+  --font-weight-extrabold: 650;
   --font-weight-bold: 600;
-  --radius-coin-sm: 12px;
-  --radius-coin: 20px;
-  --radius-coin-lg: 28px;
+  --font-weight-semibold: 550;
+  --radius-coin-sm: 10px;
+  --radius-coin: 14px;
+  --radius-coin-lg: 18px;
   --shadow-coin: var(--shadow-card);
+  --shadow-coin-landing: var(--shadow-landing);
   --shadow-coin-float: var(--shadow-float);
   --shadow-coin-accent: var(--shadow-accent);
   --ease-coin: cubic-bezier(0.2, 0, 0, 1);

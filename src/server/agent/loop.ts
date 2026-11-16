@@ -14,6 +14,7 @@ import * as q from "../db/queries";
 import { planSale } from "../actions/planner";
 import { buildChart } from "../tools/charts";
 import { chartSummaryForModel } from "./chart-summary";
+import { followUps, type ToolUse } from "./follow-ups";
 import { isInsightTool, runInsightTool, type InsightToolName } from "./insight-tools";
 import { runReadTool } from "../tools/read";
 import type { AgentModel, ModelCall, TurnInput } from "./model";
@@ -25,6 +26,8 @@ type Options = {
   db: Db;
   sessionId: string;
   userMessageId: string;
+  /** The user's message, so a follow-up suggestion never repeats it. */
+  userText?: string;
   history: HistoryMessage[];
   viewingAccountId: AccountId | null;
   model: AgentModel;
@@ -41,7 +44,7 @@ type Options = {
 /** Stop starting new model calls after this long, so the reply ends before the host's time limit. */
 const TURN_TIME_LIMIT_MS = 45_000;
 /** One retry when the model's proposal arguments could not be read. */
-const MAX_PROPOSAL_ATTEMPTS = 2;
+const MAX_PROPOSAL_RETRIES = 1;
 
 export const GENERIC_ERROR = "Coin can't answer right now. Try again in a moment.";
 const NOTHING_TO_SHOW = "I couldn't put an answer together for that. Try asking it another way.";
@@ -74,7 +77,14 @@ function statusLabel(toolName: string): string {
   return STATUS_LABELS[toolName as keyof typeof STATUS_LABELS] ?? DEFAULT_STATUS;
 }
 
-type Counts = { proposals: number; proposalAttempts: number; charts: number };
+type Counts = {
+  proposals: number;
+  proposalAttempts: number;
+  charts: number;
+  uses: ToolUse[];
+  /** Each action proposed in this reply, so the same one is never shown twice. */
+  proposed: string[];
+};
 
 function notDone(reason: string): Record<string, unknown> {
   return { outcome: "not_done", reason };
@@ -82,13 +92,18 @@ function notDone(reason: string): Record<string, unknown> {
 
 async function propose(options: Options, args: unknown, counts: Counts): Promise<unknown> {
   const proposalLimitReached = counts.proposals >= AGENT_LIMITS.max_proposals_per_turn;
-  if (proposalLimitReached || counts.proposalAttempts >= MAX_PROPOSAL_ATTEMPTS) {
-    return notDone("Only one action can be proposed per message. Ask the user to send the next one separately.");
+  if (proposalLimitReached || counts.proposalAttempts >= AGENT_LIMITS.max_proposals_per_turn + MAX_PROPOSAL_RETRIES) {
+    return notDone(`Only ${AGENT_LIMITS.max_proposals_per_turn} actions fit in one reply. Ask the user to send the rest separately.`);
   }
   counts.proposalAttempts += 1;
 
   const contacts = await q.contacts(options.db, options.sessionId);
   const repaired = repairProposalArguments(args, contacts);
+  const fingerprint = JSON.stringify(repaired);
+  if (counts.proposed.includes(fingerprint)) {
+    return notDone("That action is already on screen. Don't propose it again.");
+  }
+  counts.proposed.push(fingerprint);
   const card = await proposeAction(options.db, options.sessionId, options.userMessageId, repaired);
   if (isUnreadableProposal(card)) {
     // Recorded as blocked, but there is nothing meaningful to show the user.
@@ -120,8 +135,8 @@ async function runInsight(options: Options, name: InsightToolName, args: unknown
 
 /** A sale plan is one proposal, however many steps code gives it. Every step is a card. */
 async function planSaleSteps(options: Options, args: unknown, counts: Counts): Promise<unknown> {
-  if (counts.proposals >= AGENT_LIMITS.max_proposals_per_turn) {
-    return notDone("Only one action or plan fits in one reply.");
+  if (counts.proposals > 0) {
+    return notDone("A plan can't share a reply with another action. Ask the user to send it separately.");
   }
   const plan = await planSale(options.db, options.sessionId, options.userMessageId, args);
   if (plan.cards.length > 0) counts.proposals += 1;
@@ -187,6 +202,7 @@ async function runTools(options: Options, calls: ModelCall[], counts: Counts): P
     } catch (error) {
       result = toolFailure(call.name, error);
     }
+    counts.uses.push({ name: call.name, result });
     outputs.push({ kind: "tool_result", callId: call.id, output: JSON.stringify(result) });
   }
   return outputs;
@@ -238,7 +254,7 @@ export async function runAgent(options: Options): Promise<void> {
   const output = visibleOutputTracker(options.emit);
   const run: Options = { ...options, emit: output.emit };
   const writer = paragraphEmitter(output.emit);
-  const counts: Counts = { proposals: 0, proposalAttempts: 0, charts: 0 };
+  const counts: Counts = { proposals: 0, proposalAttempts: 0, charts: 0, uses: [], proposed: [] };
   let input: TurnInput[] = options.history.map((m) => ({ kind: "message", role: m.role, content: m.content }));
   let previousResponseId: string | null = null;
 
@@ -258,6 +274,8 @@ export async function runAgent(options: Options): Promise<void> {
       input = await runTools(run, result.calls, counts);
     }
     if (output.nothingShown()) writer.text(NOTHING_TO_SHOW);
+    const suggestions = followUps(counts.uses, options.userText ?? "");
+    if (suggestions.length > 0) options.emit({ type: "suggestions", items: suggestions });
   } catch (error) {
     reportFailure(options.emit, error);
   } finally {

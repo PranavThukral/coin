@@ -30,7 +30,7 @@ describe("action titles", () => {
     expect(actionTitle(card[0], "executed", card[1])).toBe("Paid your credit card");
     expect(actionTitle(hydro[0], "proposed", hydro[1])).toBe("Pay Lakeside Hydro");
     expect(actionTitle(send[0], "executed", send[1])).toBe("Sent to Alex");
-    expect(actionTitle(trade[0], "proposed", trade[1])).toBe("Buy 10 shares of USEQ.CX");
+    expect(actionTitle(trade[0], "proposed", trade[1])).toBe("Buy 10 shares of US Total Market ETF");
   });
 
   it("never shows the card's masked number", () => {

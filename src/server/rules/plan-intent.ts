@@ -33,7 +33,7 @@ function mentions(messages: string[], account: AccountId): boolean {
 }
 
 /** A reply to Coin's question: short, and not itself a question. */
-function isShortAnswer(message: string): boolean {
+export function isShortAnswer(message: string): boolean {
   const words = message.trim().split(/\s+/).filter(Boolean);
   return words.length > 0 && words.length <= SHORT_ANSWER_WORDS && !message.includes("?");
 }

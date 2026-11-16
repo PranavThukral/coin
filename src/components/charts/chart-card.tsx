@@ -377,6 +377,13 @@ function CartesianBody({ chart }: { chart: ChartPayload }) {
   return <Lines chart={chart} />;
 }
 
+/** The highlighted row by its fuller name when the chart carries one ("Northwind Robotics", not "NRTH.CX"). */
+function highlightName(chart: ChartPayload): string {
+  const x = chart.highlight?.x ?? "";
+  const row = chart.data.find((item) => String(item[chart.x.key]) === x);
+  return typeof row?.name === "string" ? row.name : humanize(x);
+}
+
 export function ChartCard({
   chart,
   height = 200,
@@ -412,7 +419,7 @@ export function ChartCard({
       <Legend chart={chart} />
       {chart.highlight && (
         <p className="mt-3 flex w-fit items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-1 text-xs font-extrabold text-warning">
-          {humanize(chart.highlight.x)}: {chart.highlight.label}
+          {highlightName(chart)}: {chart.highlight.label}
         </p>
       )}
     </figure>

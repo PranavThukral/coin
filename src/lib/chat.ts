@@ -17,6 +17,8 @@ export interface ChatMessage {
   /** What Coin did to answer, in order ("Reading your transactions..."). */
   steps: string[];
   parts: MessagePart[];
+  /** Follow-up questions offered under the reply (chosen by code on the server). */
+  suggestions: string[];
   error: string | null;
   done: boolean;
 }
@@ -34,8 +36,8 @@ let localId = 0;
 const nextId = (prefix: string) => `${prefix}-${Date.now()}-${++localId}`;
 
 export function addUserMessage(state: ChatState, text: string): ChatState {
-  const user: ChatMessage = { id: nextId("u"), role: "user", text, steps: [], parts: [], error: null, done: true };
-  const coin: ChatMessage = { id: nextId("c"), role: "coin", text: "", steps: [], parts: [], error: null, done: false };
+  const user: ChatMessage = { id: nextId("u"), role: "user", text, steps: [], parts: [], suggestions: [], error: null, done: true };
+  const coin: ChatMessage = { id: nextId("c"), role: "coin", text: "", steps: [], parts: [], suggestions: [], error: null, done: false };
   return { messages: [...state.messages, user, coin], status: "Thinking\u2026", busy: true };
 }
 
@@ -68,6 +70,8 @@ export function applyEvent(state: ChatState, event: ChatEvent): ChatState {
       return updateLastCoin(state, (m) => ({ ...m, parts: [...m.parts, { kind: "chart", chart: event.chart }] }));
     case "action_card":
       return updateLastCoin(state, (m) => ({ ...m, parts: [...m.parts, { kind: "card", card: event.card }] }));
+    case "suggestions":
+      return updateLastCoin(state, (m) => ({ ...m, suggestions: event.items }));
     case "error":
       return updateLastCoin({ ...state, status: null, busy: false }, (m) => ({ ...m, error: event.message, done: true }));
     case "done":
@@ -89,13 +93,14 @@ export function endTurn(state: ChatState): ChatState {
 
 /** "Use $X instead": the server's request text, then Coin's new card. */
 export function addRetry(state: ChatState, text: string, card: ActionCard): ChatState {
-  const user: ChatMessage = { id: nextId("u"), role: "user", text, steps: [], parts: [], error: null, done: true };
+  const user: ChatMessage = { id: nextId("u"), role: "user", text, steps: [], parts: [], suggestions: [], error: null, done: true };
   const coin: ChatMessage = {
     id: nextId("c"),
     role: "coin",
     text: "Here it is at the largest amount that passes the checks.",
     steps: [],
     parts: [{ kind: "card", card }],
+    suggestions: [],
     error: null,
     done: true,
   };

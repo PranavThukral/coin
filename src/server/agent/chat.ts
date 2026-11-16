@@ -145,6 +145,7 @@ export async function chat(request: Request, context: SessionContext): Promise<R
       db,
       sessionId,
       userMessageId,
+      userText: body.message,
       history,
       viewingAccountId: body.viewing_account_id,
       model,

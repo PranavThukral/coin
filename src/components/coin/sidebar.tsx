@@ -170,8 +170,41 @@ function Message({ message, controls }: { message: ChatMessage; controls: CardCo
   );
 }
 
-function Composer({ disabled, onSend }: { disabled: boolean; onSend: (text: string) => void }) {
+/** Questions worth asking next, under Coin's latest reply. The server chooses them; tapping one asks it. */
+function FollowUps({ items, onPick }: { items: string[]; onPick: (text: string) => void }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="coin-rise flex flex-wrap gap-1.5" style={stagger(2)}>
+      {items.map((text) => (
+        <button
+          key={text}
+          type="button"
+          onClick={() => onPick(text)}
+          className="rounded-full border border-border bg-surface px-3 py-1.5 text-left text-[13px] font-medium text-muted transition-colors hover:border-border-strong hover:text-foreground"
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Composer({ disabled, prefill, onSend }: {
+  disabled: boolean;
+  /** A request written for the visitor to edit and send (from a quick action). */
+  prefill: { text: string; id: number } | null;
+  onSend: (text: string) => void;
+}) {
   const [draft, setDraft] = useState("");
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!prefill) return;
+    const frame = requestAnimationFrame(() => {
+      setDraft(prefill.text);
+      field.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [prefill]);
   const submit = () => {
     if (!draft.trim() || disabled) return;
     onSend(draft);
@@ -187,6 +220,7 @@ function Composer({ disabled, onSend }: { disabled: boolean; onSend: (text: stri
     >
       <div className="flex items-end gap-2 rounded-[26px] bg-surface-soft py-2 pl-5 pr-2 transition-shadow focus-within:shadow-[0_0_0_2px_var(--accent)]">
         <textarea
+          ref={field}
           value={draft}
           onChange={(event) => setDraft(event.target.value.slice(0, AGENT_LIMITS.max_input_chars))}
           onKeyDown={(event) => {
@@ -262,7 +296,9 @@ export function CoinSidebar({
   viewingAccountId,
   onCollapse,
   replayOnly = false,
+  prefill = null,
 }: {
+  prefill?: { text: string; id: number } | null;
   coin: CoinConversation;
   viewingAccountId: AccountId | null;
   onCollapse: () => void;
@@ -286,6 +322,9 @@ export function CoinSidebar({
         {chat.messages.map((message) => (
           <Message key={message.id} message={message} controls={controls} />
         ))}
+        {!chat.busy && !replayOnly && (
+          <FollowUps items={chat.messages.at(-1)?.suggestions ?? []} onPick={(text) => send(text, viewingAccountId)} />
+        )}
       </div>
 
       {replayOnly ? (
@@ -297,7 +336,7 @@ export function CoinSidebar({
           to ask Coin anything.
         </p>
       ) : (
-        <Composer disabled={chat.busy} onSend={(text) => send(text, viewingAccountId)} />
+        <Composer disabled={chat.busy} prefill={prefill} onSend={(text) => send(text, viewingAccountId)} />
       )}
     </aside>
   );

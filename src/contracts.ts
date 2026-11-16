@@ -902,12 +902,16 @@ export interface AffordabilityResult {
   /** Largest amount that keeps chequing >= buffer through the window. */
   max_comfortable_cents: number;
   upcoming_considered: Array<{ label: string; date: IsoDateStr; amount_cents: number }>;
+  /** How much more chequing would need to stay at or above the buffer (0 when it does). */
+  shortfall_cents: number;
+  /** What is in savings, which could cover a shortfall with a transfer. */
+  savings_balance_cents: number;
 }
 
 /** Hard ceilings on one agent turn. */
 export const AGENT_LIMITS = {
   max_tool_steps: 6,
-  max_proposals_per_turn: 1,
+  max_proposals_per_turn: 3, // several only when the user asked for each one
   max_charts_per_turn: 3,
   max_input_chars: 800,
   max_output_tokens: 900,
@@ -1048,6 +1052,8 @@ export type ChatEvent =
   | { type: "text_delta"; text: string }
   | { type: "chart"; chart: ChartPayload }
   | { type: "action_card"; card: ActionCard }
+  /** Follow-up questions to offer under the reply. Chosen by code, never written by the model. */
+  | { type: "suggestions"; items: string[] }
   | { type: "error"; code: "budget_exhausted" | "rate_limited" | "input_too_long" | "model_error" | "session_expired"; message: string }
   | { type: "done" };
 

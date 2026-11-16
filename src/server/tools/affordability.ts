@@ -35,8 +35,11 @@ export async function checkAffordability(
   } else if (lowest < RULE_LIMITS.min_buffer_cents) {
     verdict = "tight";
   }
+  const savings = accounts.find(a => a.id === "acc_hisa")?.balance_cents ?? 0;
   return {
     verdict, lowest_balance_cents: lowest, lowest_balance_date: lowestDate,
     max_comfortable_cents: Math.max(0, available), upcoming_considered: events,
+    shortfall_cents: Math.max(0, RULE_LIMITS.min_buffer_cents - lowest),
+    savings_balance_cents: savings,
   };
 }

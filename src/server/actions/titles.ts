@@ -3,7 +3,7 @@
  * figure directly underneath, so repeating it in the title is noise.
  * Executed cards read in the past tense ("Paid your credit card").
  */
-import { CARD_BILL_ID, type ActionStatus, type Proposal } from "../../contracts";
+import { CARD_BILL_ID, SEED_SECURITIES, type ActionStatus, type Proposal } from "../../contracts";
 
 const VERBS = {
   transfer: ["Move", "Moved"],
@@ -32,7 +32,8 @@ export function actionTitle(p: Proposal | null, status: ActionStatus, destinatio
       return `${verb("etransfer", status)} to ${destination ?? "recipient"}`;
     case "trade": {
       const shares = p.quantity === 1 ? "1 share" : `${p.quantity} shares`;
-      return `${verb(p.side, status)} ${shares} of ${p.ticker}`;
+      const security = SEED_SECURITIES.find((item) => item.ticker === p.ticker);
+      return `${verb(p.side, status)} ${shares} of ${security?.name ?? p.ticker}`;
     }
   }
 }

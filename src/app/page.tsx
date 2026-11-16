@@ -33,8 +33,8 @@ function SeeScene() {
   return (
     <div className="flex h-full flex-col justify-between">
       <div>
-        <p className="money text-2xl font-extrabold tracking-tight">$349,400</p>
-        <p className="money text-xs font-extrabold text-gain">+19.4% past year</p>
+        <p className="money text-2xl font-[800] tracking-tight">$349,400</p>
+        <p className="money text-xs font-[800] text-gain">+19.4% past year</p>
       </div>
       <div className="coin-wipe" style={beat(8)}>
         <svg viewBox="0 0 280 72" className="block w-full overflow-visible" aria-hidden="true">
@@ -57,15 +57,15 @@ function SeeScene() {
 function ApproveScene() {
   return (
     <div className="flex h-full flex-col justify-center" aria-hidden="true">
-      <div className="rounded-coin bg-surface p-4 shadow-coin">
-        <p className="flex w-fit items-center gap-1.5 rounded-full bg-gain-soft px-2.5 py-1 text-[11px] font-extrabold text-gain">
+      <div className="rounded-[20px] bg-surface p-4 shadow-coin">
+        <p className="flex w-fit items-center gap-1.5 rounded-full bg-gain-soft px-2.5 py-1 text-[11px] font-[800] text-gain">
           <CheckIcon className="h-3 w-3" />
           Checks passed
         </p>
-        <p className="mt-2.5 text-sm font-extrabold">Pay your credit card</p>
+        <p className="mt-2.5 text-sm font-[800]">Pay your credit card</p>
         <div className="mt-1 flex items-end justify-between gap-3">
-          <p className="money text-2xl font-extrabold tracking-tight">$1,250.00</p>
-          <span className="rounded-full bg-accent px-4 py-1.5 text-xs font-extrabold text-accent-ink shadow-coin-accent">Approve</span>
+          <p className="money text-2xl font-[800] tracking-tight">$1,250.00</p>
+          <span className="rounded-full bg-accent px-4 py-1.5 text-xs font-[800] text-accent-ink shadow-coin-accent">Approve</span>
         </div>
       </div>
     </div>
@@ -98,8 +98,8 @@ function FloatingCards() {
     <section className="grid gap-6 md:grid-cols-3 lg:gap-8" aria-label="What Coin does">
       {CARDS.map((card, index) => (
         <div key={card.title} className={`coin-rise ${card.offset}`} style={beat(index * 2 + 4)}>
-          <article className="coin-float rounded-coin-lg bg-surface p-3 shadow-coin-float">
-            <div className="h-44 rounded-coin bg-surface-soft p-4">{card.scene}</div>
+          <article className="coin-float rounded-[28px] bg-surface p-3 shadow-coin-landing">
+            <div className="h-44 rounded-[20px] bg-surface-soft p-4">{card.scene}</div>
             <div className="px-3 pb-4 pt-5">
               <h2 className="text-2xl font-[800] tracking-tight">{card.title}</h2>
               <p className="mt-1.5 text-[15px] font-medium leading-snug text-muted">{card.body}</p>
@@ -139,7 +139,7 @@ function MockDashboard() {
       </svg>
       <ul className="mt-4 space-y-2">
         {MOCK_ACCOUNTS.map((account) => (
-          <li key={account.name} className="flex items-center justify-between rounded-coin-sm bg-surface-soft px-3 py-2 text-xs font-bold">
+          <li key={account.name} className="flex items-center justify-between rounded-[12px] bg-surface-soft px-3 py-2 text-xs font-bold">
             <span>{account.name}</span>
             <span className="money">{account.value}</span>
           </li>
@@ -161,7 +161,7 @@ function MockCoinPanel() {
         Move $2,000 to chequing
       </p>
       <p className="text-[11px] font-medium text-muted">Here&rsquo;s the card to approve.</p>
-      <div className="rounded-coin-sm bg-surface p-3 shadow-coin">
+      <div className="rounded-[12px] bg-surface p-3 shadow-coin">
         <p className="flex w-fit items-center gap-1 rounded-full bg-gain-soft px-2 py-0.5 text-[9px] font-[800] text-gain">
           <CheckIcon className="h-2.5 w-2.5" />
           Checks passed
@@ -178,7 +178,7 @@ function MockCoinPanel() {
 function WindowMock() {
   return (
     <div className="coin-rise pointer-events-none hidden select-none lg:block" style={beat(3)} aria-hidden="true">
-      <div className="coin-tilt overflow-hidden rounded-coin-lg border border-border bg-surface shadow-coin-float">
+      <div className="coin-tilt overflow-hidden rounded-[28px] border border-border bg-surface shadow-coin-landing">
         <div className="flex items-center gap-1.5 border-b border-border px-4 py-2.5">
           <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
           <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />

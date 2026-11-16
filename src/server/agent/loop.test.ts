@@ -185,7 +185,7 @@ describe("proposals the code cannot read", () => {
     expect(toolResult(model, 1).outcome).toBe("invalid_arguments");
     expect(toolResult(model, 2).outcome).toBe("card_shown_for_approval");
     expect(toolResult(model, 3).outcome).toBe("not_done");
-    expect(cards(events).map((card) => card.title)).toEqual(["Buy 5 shares of NRTH.CX"]);
+    expect(cards(events).map((card) => card.title)).toEqual(["Buy 5 shares of Northwind Robotics"]);
 
     // The unreadable attempt is still on record as blocked.
     const rows = await fixture.db.query<{ status: string }>(

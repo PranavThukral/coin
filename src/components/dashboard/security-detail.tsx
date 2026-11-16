@@ -153,9 +153,11 @@ function AskCoin({ name, onAsk }: { name: string; onAsk: (question: string) => v
   );
 }
 
-export function SecurityDetail({ ticker, refreshKey, onBack, onAsk }: {
+export function SecurityDetail({ ticker, refreshKey, backLabel = "Back to the account", onBack, onAsk }: {
   ticker: string;
   refreshKey: number;
+  /** Where the back button returns to. */
+  backLabel?: string;
   onBack: () => void;
   /** Hands a question about this security to Coin. */
   onAsk?: (question: string) => void;
@@ -171,7 +173,7 @@ export function SecurityDetail({ ticker, refreshKey, onBack, onAsk }: {
         className="flex items-center gap-2 rounded-full bg-surface px-4 py-2 text-sm font-extrabold shadow-coin transition-transform hover:-translate-x-0.5"
       >
         <BackIcon />
-        Back to the account
+        {backLabel}
       </button>
       <section className="coin-rise rounded-coin-lg bg-surface shadow-coin-float">
         <PriceHeader data={data} />

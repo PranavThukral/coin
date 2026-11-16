@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountId as AccountIdSchema, type AccountView } from "../contracts";
 import type { AccountId } from "../contracts";
@@ -11,6 +10,7 @@ import { CoinSidebar } from "./coin/sidebar";
 import { useCoinChat } from "./coin/use-coin-chat";
 import { DemoPlayer } from "./demo/demo-player";
 import { Dashboard } from "./dashboard/dashboard";
+import { NavBar, NavRail, type View } from "./shell/nav";
 
 const MIN_WIDTH = 340;
 const DEFAULT_WIDTH = 420;
@@ -58,28 +58,6 @@ function useSidebarWidth() {
   const nudge = (delta: number) => setWidth((current) => clampWidth(current + delta));
 
   return { width, startDrag, drag, endDrag, nudge };
-}
-
-function TopBar({ mode }: { mode: "live" | "demo" }) {
-  const tab = "rounded-full px-3.5 py-1.5 text-xs font-extrabold transition-colors";
-  const on = "bg-surface text-foreground shadow-coin";
-  const off = "text-subtle hover:text-foreground";
-  return (
-    <header className="flex items-center justify-between gap-4 pb-8">
-      <Link href="/" className="flex items-center gap-2.5">
-        <Mascot size={30} />
-        <span className="text-xl font-extrabold tracking-tight">Coin</span>
-      </Link>
-      <nav className="flex gap-1 rounded-full bg-border/60 p-1" aria-label="Mode">
-        <Link href="/app" aria-current={mode === "live" ? "page" : undefined} className={`${tab} ${mode === "live" ? on : off}`}>
-          Live
-        </Link>
-        <Link href="/demo" aria-current={mode === "demo" ? "page" : undefined} className={`${tab} ${mode === "demo" ? on : off}`}>
-          Scripted demo
-        </Link>
-      </nav>
-    </header>
-  );
 }
 
 /** `?account=acc_tfsa` deep-links straight into an account. */
@@ -201,6 +179,8 @@ function ResizeHandle({ sidebar }: { sidebar: ReturnType<typeof useSidebarWidth>
 
 function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live" | "demo" }) {
   const [viewing, setViewing] = useDeepLinkedAccount();
+  const [view, setView] = useState<View>("home");
+  const [prefill, setPrefill] = useState<{ text: string; id: number } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const sidebar = useSidebarWidth();
 
@@ -209,19 +189,31 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
   const coin = useCoinChat(transport, refresh);
   const panel = useCoinOpen(coin.chat.messages.length > 0, mode);
   const demo = mode === "demo";
+  const openView = (next: View) => {
+    setViewing(null);
+    setView(next);
+  };
+  /** A quick action: open Coin with the request written and ready to edit. */
+  const compose = (text: string) => {
+    panel.open();
+    setPrefill({ text, id: Date.now() });
+  };
 
   return (
     <div className="coin-canvas flex h-dvh overflow-hidden text-foreground">
+      <NavRail view={view} accountId={viewing} mode={mode} refreshKey={refreshKey} onView={openView} onAccount={setViewing} />
       {/* The dashboard scrolls; in the demo, the player is docked under it and never covers it. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <main className={`min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7 lg:px-10 ${demo ? "pb-60 lg:pb-10" : "pb-24"}`}>
-          <div className="mx-auto max-w-5xl">
-            <TopBar mode={mode} />
+        <NavBar view={view} accountId={viewing} mode={mode} onView={openView} />
+        <main className={`min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8 lg:px-10 ${demo ? "pb-60 lg:pb-10" : "pb-24"}`}>
+          <div className="@container mx-auto max-w-5xl">
             <Dashboard
+              view={view}
               openAccountId={viewing}
               onOpenAccount={setOpenAccount}
               refreshKey={refreshKey}
               onAsk={demo ? undefined : (question) => coin.send(question, viewing)}
+              onCompose={demo ? undefined : compose}
             />
           </div>
         </main>
@@ -234,7 +226,7 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
       >
         <ResizeHandle sidebar={sidebar} />
         <div className="h-full w-full lg:w-(--coin-width)">
-          <CoinSidebar coin={coin} viewingAccountId={viewing} onCollapse={panel.close} replayOnly={demo} />
+          <CoinSidebar coin={coin} viewingAccountId={viewing} onCollapse={panel.close} replayOnly={demo} prefill={prefill} />
         </div>
       </div>
 
