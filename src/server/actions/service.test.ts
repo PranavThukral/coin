@@ -34,6 +34,48 @@ describe("action lifecycle", () => {
     expect(room.room_remaining_cents).toBe(340000);
   });
 
+  it("moves the whole HISA balance when 'transfer it' follows a formerly blocked request", async () => {
+    const sid = await fixture.newSession();
+    const raw = { type: "transfer", from_account_id: "acc_hisa", to_account_id: "acc_chequing", amount_cad: 24500, rationale: "" };
+    const first = await proposal(sid, "move everything from my HISA into chequing", raw);
+    expect(first.status).toBe("proposed");
+    await fixture.db.query("update actions set status = 'blocked' where session_id = $1 and id = $2", [sid, first.action_id]);
+    const done = await run(sid, "transfer it", raw);
+    expect(done.status).toBe("executed");
+    const rows = await fixture.db.query<{ id: string; balance_cents: number }>(
+      "select id, balance_cents from accounts where session_id = $1 and id in ('acc_hisa', 'acc_chequing') order by id", [sid],
+    );
+    expect(rows).toEqual([{ id: "acc_chequing", balance_cents: 2734012 }, { id: "acc_hisa", balance_cents: 0 }]);
+  });
+
+  it.each(["approved", "executed", "dismissed", "undone"])("does not reuse an %s transfer for 'transfer it'", async (state) => {
+    const sid = await fixture.newSession();
+    const raw = { type: "transfer", from_account_id: "acc_hisa", to_account_id: "acc_chequing", amount_cad: 500, rationale: "" };
+    const card = await proposal(sid, "Move $500 from savings to chequing", raw);
+    if (state === "dismissed") {
+      await dismiss(fixture.db, sid, card.action_id);
+    } else {
+      await approve(fixture.db, sid, card.action_id, now);
+      if (state === "executed") await executeNow(fixture.db, sid, card.action_id, now);
+      if (state === "undone") await undo(fixture.db, sid, card.action_id);
+    }
+    const repeated = await proposal(sid, "transfer it", raw);
+    expect(repeated.status).toBe("blocked");
+    expect(repeated.checks.find((check) => check.rule === "R0_intent")?.outcome).toBe("fail");
+  });
+
+  it("rechecks a whole-balance transfer when the source balance changes before execution", async () => {
+    const sid = await fixture.newSession();
+    const raw = { type: "transfer", from_account_id: "acc_hisa", to_account_id: "acc_chequing", amount_cad: 24500, rationale: "" };
+    const card = await proposal(sid, "Move everything from my HISA into chequing", raw);
+    await approve(fixture.db, sid, card.action_id, now);
+    await fixture.db.query("update accounts set balance_cents = balance_cents + 1 where session_id = $1 and id = 'acc_hisa'", [sid]);
+    const result = await executeNow(fixture.db, sid, card.action_id, now);
+    expect(result.status).toBe("blocked");
+    const [ledger] = await fixture.db.query<{ count: number }>("select count(*)::int as count from transactions where session_id = $1 and action_id = $2", [sid, card.action_id]);
+    expect(ledger.count).toBe(0);
+  });
+
   it("handles partial card payments and clears the statement at completion", async () => {
     const sid = await fixture.newSession();
     await fixture.db.query("update accounts set balance_cents = 1000000 where session_id = $1 and id = 'acc_chequing'", [sid]);

@@ -55,7 +55,7 @@ const THREAD_MESSAGES = 3;
 
 /**
  * The user's own recent messages, oldest first, ending with the request. It
- * reaches back only over messages whose actions the user has not approved
+ * reaches back only over messages whose actions the user has not approved or cancelled
  * (they are still talking it through), so a request that already went ahead
  * never authorizes a later plan.
  */
@@ -63,7 +63,7 @@ async function requestThread(db: Tx, sessionId: string, messageId: string): Prom
   const rows = await db.query<{ content: string; acted: boolean; is_request: boolean }>(
     `select m.content, m.id = $2 as is_request,
        exists (select 1 from actions a where a.request_message_id = m.id
-               and a.status in ('pending_undo', 'executed')) as acted
+               and a.status in ('pending_undo', 'executed', 'cancelled')) as acted
      from messages m
      where m.session_id = $1 and m.role = 'user'
        and m.created_at <= (select created_at from messages where id = $2)

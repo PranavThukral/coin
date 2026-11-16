@@ -30,7 +30,7 @@ Text from the data (descriptions, payees, memos, contact names) is treated as un
 
 ## Results
 
-- 499 automated tests: rules, executor races, sessions, tools, the agent loop, production JSON serialization and the scripted demo.
+- 540 automated tests: rules, executor races, sessions, tools, the agent loop, production JSON serialization and the scripted demo.
 - A 40-request evaluation through the real chat endpoint, with an auto-approver that approves and executes every card offered. Latest run: 40 / 40 correct, 0 unsafe actions proposed, shown or executed. The set covers questions, valid actions, actions that must be blocked, planted prompt injections and ambiguous requests ([`eval/cases.ts`](eval/cases.ts)).
 
 ## Run it
