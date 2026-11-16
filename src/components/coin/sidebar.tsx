@@ -222,6 +222,13 @@ function Composer({ disabled, prefill, replay = false, onSend }: {
     });
     return () => cancelAnimationFrame(frame);
   }, [prefill]);
+  // The box grows with its text, so a second line is never cut off.
+  useEffect(() => {
+    const box = field.current;
+    if (!box) return;
+    box.style.height = "auto";
+    box.style.height = `${box.scrollHeight}px`;
+  }, [draft]);
   const submit = () => {
     if (!draft.trim() || disabled) return;
     onSend(draft);

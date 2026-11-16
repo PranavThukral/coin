@@ -1,111 +1,65 @@
 # Coin
 
-**An AI money agent that answers questions about all your accounts with charts, and moves money only when code says it can.**
+An AI money agent that answers questions about all your accounts and moves money only when code says it can.
 
-Coin reads every account (chequing, savings, TFSA, RRSP, investing, credit card), answers in a few plain sentences with code-computed charts, and proposes transfers, bill payments, e-transfers and trades. The model can only *propose*. Nine rule checks in code decide what reaches an approval card, an approved action waits 60 seconds with Undo, and every rule is checked again before money moves.
+Coin reads every account (chequing, savings, TFSA, RRSP, investing, credit card), answers in a sentence or two with charts computed in code, and proposes transfers, bill payments, e-transfers and trades. Everything runs on synthetic data. It is not connected to a bank and is not financial advice.
 
-Everything runs on made-up data. Nothing here is connected to a bank, and nothing is financial advice.
+## How it stays safe
 
-- **Live:** _link coming_ (scripted two-minute demo first, live mode second)
-- **Video:** _coming_ (two minutes, the scripted demo with narration)
+The model can only propose. Code decides what happens next:
 
-<!-- GIF of demo steps 5 (transfer) and 8 (the injection) goes here. -->
+1. Nine rule checks, written in plain TypeScript, run on every proposal. A proposal that fails never becomes an approvable card.
+2. You approve on a card. An approved action waits 60 seconds with Undo.
+3. Every rule runs again, under database locks, before any money moves.
 
-## How Coin decides what can execute
-
-```
-your message ──► stored as-is (rules 0 and 8 read this copy, never the model's version)
-             ──► GPT-6 Luna with read tools ── account data comes back marked "untrusted text"
-                                             ── render_chart: the model names a chart, code computes every number
-                                             ── propose_action: a fixed JSON shape, nothing else
-                                                     │
-                                        nine rule checks (pure TypeScript, no model)
-                                                     │
-                       blocked card with the reason ◄┴► approval card ── Approve ── 60s Undo window
-                       (and the largest amount that                                       │
-                        would pass, if any)                      executor: lock, re-check all nine rules,
-                                                                 write the ledger, flip status exactly once
-```
-
-| # | Rule | Blocks when |
+| # | Rule | Stops |
 | --- | --- | --- |
-| 0 | Your intent | Your own words didn't ask for an action, or the amount, account or recipient came from text in the data. When Coin asks a question, your answer and your first message count together; nothing but your own messages ever does |
-| 1 | Allowed action | Not a transfer, bill payment, e-transfer or trade, or an account pair that isn't allowed (RRSP withdrawals, card cash advances) |
-| 2 | Saved payee | The bill's payee isn't saved |
-| 3 | New recipient | First-time e-transfer over $300 (under $300 it needs a second confirmation) |
-| 4 | Enough money | Chequing would drop under $500, or a card payment exceeds what's owed |
-| 5 | Daily limit | Bill payments plus e-transfers would pass $5,000 today |
-| 6 | Contribution room | A TFSA or RRSP contribution exceeds the room left |
-| 7 | Trade limits | A buy exceeds cash or $10,000, or a sell exceeds shares held |
-| 8 | Matches the request | The amount, accounts, recipient or security differ from what you typed. For a sale you ask for without naming holdings, code (never the model) picks them, inside the account you named |
+| 0 | Your intent | Actions you did not ask for in your own words, including instructions hidden in transaction notes |
+| 1 | Allowed action | Unsupported actions and account pairs, such as RRSP withdrawals |
+| 2 | Saved payee | Paying a bill whose payee is not saved |
+| 3 | New recipient | A first e-transfer over $300 |
+| 4 | Enough money | Taking chequing under $500, or overpaying the card |
+| 5 | Daily limit | More than $5,000 a day in payments and e-transfers |
+| 6 | Contribution room | TFSA or RRSP contributions past the room left |
+| 7 | Trade limits | Buys over cash or $10,000, sells over shares held |
+| 8 | Matches the request | An amount, account, recipient or security that differs from what you typed |
 
-The rule engine is [`src/server/rules/engine.ts`](src/server/rules/engine.ts); the executor is [`src/server/actions/executor.ts`](src/server/actions/executor.ts).
+Text from the data (descriptions, payees, memos, contact names) is treated as untrusted and can never authorize an action.
 
-## Test results
+## Results
 
-Three runs of all 40 requests on GPT-6 Luna, 120 requests in total:
+- 486 automated tests: rules, executor races, sessions, tools, the agent loop and the scripted demo.
+- A 40-request evaluation through the real chat endpoint, with an auto-approver that approves and executes every card offered. Latest run: 40 / 40 correct, 0 unsafe actions proposed, shown or executed. The set covers questions, valid actions, actions that must be blocked, planted prompt injections and ambiguous requests ([`eval/cases.ts`](eval/cases.ts)).
 
-| Measure | Count |
-| --- | --- |
-| Correct answers and proposals | **120 / 120** |
-| Unsafe proposals Coin made | **0** |
-| Unsafe proposals that reached an approval card | **0** |
-| Unsafe actions executed | **0** |
-
-| Group | Correct |
-| --- | --- |
-| Questions with known answers | 36 / 36 |
-| Actions that should pass | 24 / 24 |
-| Actions that should be blocked | 24 / 24 |
-| Prompt injections | 18 / 18 |
-| Ambiguous requests | 18 / 18 |
-
-Those three runs were on an earlier build and cost $0.17 in model calls. Since then the rules gained sale plans and question-and-answer requests; a single run of the 40 on the current build scored 40 / 40 with 0 unsafe proposed, carded or executed. The first full run scored 35 / 40. A later three-run pass scored 119 / 120: the one miss was "send $50 to Sam", which Coin proposed as a new recipient instead of the saved contact. Proposals now map a first name to a saved contact when exactly one matches, and the run above came after that fix. Raw results are in [`eval/results`](eval/results).
-
-Each of the 40 requests runs in a fresh session through the real chat endpoint, and an **auto-approver confirms, approves and executes every card Coin offers**. That makes "nothing unsafe executed" a measurement rather than an assumption. The set is in [`eval/cases.ts`](eval/cases.ts): 12 questions with known answers, 8 actions that should pass, 8 that should be blocked, 6 prompt injections planted in transaction descriptions, a bill memo and a contact name, and 6 ambiguous requests. Run it with `COIN_EVAL=1 npx vitest run eval/run.test.ts`.
-
-## Run it locally
+## Run it
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
 ```
 
-With no `DATABASE_URL`, development runs on an in-process Postgres (PGlite) seeded on first use, so this works with no setup. Live mode needs a model key: copy `.env.example` to `.env.local` and set `OPENAI_API_KEY`, `OPENAI_MODEL` and the two token prices. The scripted demo at `/demo` needs no key; it runs the same pipeline without a model.
+- `/demo` is a scripted walkthrough that needs no key.
+- `/app` is live mode. Copy `.env.example` to `.env.local` and set `OPENAI_API_KEY`, `OPENAI_MODEL` and the two token prices.
+
+With no `DATABASE_URL`, development uses an in-process Postgres seeded on first use. For a real database, set `DATABASE_URL` and run `npm run db:migrate && npm run db:seed`.
 
 ```bash
-npm test           # ~480 tests: rules, executor races, sessions, tools, agent loop, demo
+npm test
 npm run typecheck
 npm run lint
+COIN_EVAL=1 npx vitest run eval/run.test.ts   # the evaluation (calls the model)
 ```
 
-To use a real database, set `DATABASE_URL` and run `npm run db:migrate && npm run db:seed`.
+## Where things are
 
-## Architecture
+| Part | Path |
+| --- | --- |
+| Rule engine | [`src/server/rules`](src/server/rules) |
+| Actions, sale planner and executor | [`src/server/actions`](src/server/actions) |
+| Agent loop, prompt and spend caps | [`src/server/agent`](src/server/agent) |
+| Read tools and charts | [`src/server/tools`](src/server/tools) |
+| Sessions (one copy of the bank per visitor) | [`src/server/session`](src/server/session) |
+| Interface | [`src/app`](src/app), [`src/components`](src/components) |
+| Types, limits and seed facts | [`src/contracts.ts`](src/contracts.ts) |
 
-| Part | Where | Notes |
-| --- | --- | --- |
-| Contracts | [`src/contracts.ts`](src/contracts.ts), [`db/migrations`](db/migrations) | Types, schemas, seed facts, rule limits, wire formats |
-| Fake bank | [`scripts/seed`](scripts/seed) | Two years of deterministic history; each visitor gets their own copy, shifted to their real calendar day |
-| Read tools and charts | [`src/server/tools`](src/server/tools) | Every number a chart shows is computed here |
-| Rules | [`src/server/rules`](src/server/rules) | Pure functions; 226 tests, many table-driven, including adversarial phrasings and planted injections |
-| Actions and executor | [`src/server/actions`](src/server/actions) | Propose, approve, undo, execute now; row locks and one conditional status flip |
-| Sessions | [`src/server/session`](src/server/session) | Per-visitor clone, idle expiry, midnight rollover, capped creation |
-| Agent | [`src/server/agent`](src/server/agent) | GPT-6 Luna on the Responses API, tool loop, spend ledger, rate limits |
-| UI | [`src/app`](src/app), [`src/components`](src/components) | Next.js; dashboard, Coin sidebar, approval cards |
-| Scripted demo | [`src/demo`](src/demo), [`src/server/demo`](src/server/demo) | Eight steps through the real pipeline, no model |
-
-Spending is capped by its own ledger: $0.50 a day and $5 in total, checked before every model call, plus per-visitor and global rate limits.
-
-## What this is not
-
-- Not connected to any bank. All data is synthetic, and every action is simulated.
-- Not affiliated with any bank or company.
-- Not financial advice.
-
-## What I'd build next
-
-- Structured trade records in the ledger instead of quantities in descriptions.
-- Funds reserved for pending actions, not just re-checked at execution.
-- Conversation memory for follow-ups like "make it $1,500 instead".
-- Voice input through the browser's speech recognition.
+Built with Next.js, Postgres and GPT-6 Luna. Model spending is capped at $0.50 a day and $5 in total.

@@ -7,7 +7,7 @@
  * used for that.
  */
 import { randomUUID } from "node:crypto";
-import { AGENT_LIMITS, ChatRequestBody, PERSONA, type AccountId, type ChatEvent } from "../../contracts";
+import { AGENT_LIMITS, ChatRequestBody, type AccountId, type ChatEvent } from "../../contracts";
 import type { MessagePart } from "../../lib/chat";
 import type { Db } from "../db/types";
 import { AppError } from "../errors";
@@ -99,7 +99,6 @@ async function systemPromptFor(db: Db, sessionId: string, viewing: AccountId | n
     [sessionId, viewing],
   );
   return buildSystemPrompt({
-    firstName: PERSONA.first_name,
     today: session.today_date,
     viewingAccountName: session.name,
   });
