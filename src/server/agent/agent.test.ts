@@ -42,7 +42,7 @@ describe("agent", () => {
   afterAll(() => { process.env = oldEnv; setModelForTests(null); });
 
   it("snapshots the system prompt", () => {
-    expect(buildSystemPrompt({ firstName: "Jordan", today: "2026-11-14", viewingAccountName: "TFSA" })).toMatchSnapshot();
+    expect(buildSystemPrompt({ today: "2026-11-14", viewingAccountName: "TFSA" })).toMatchSnapshot();
   });
 
   it("streams a proposed transfer and records usage", async () => {

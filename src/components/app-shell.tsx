@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AccountId as AccountIdSchema, type AccountView } from "../contracts";
 import type { AccountId } from "../contracts";
 import { api } from "../lib/api";
@@ -11,64 +11,17 @@ import { useCoinChat } from "./coin/use-coin-chat";
 import { DemoPlayer } from "./demo/demo-player";
 import { Dashboard } from "./dashboard/dashboard";
 import { NavBar, NavRail, type View } from "./shell/nav";
+import { ResizeGrip, useResizable } from "./ui/resizable";
 
-const MIN_WIDTH = 340;
-const DEFAULT_WIDTH = 420;
-const WIDTH_KEY = "coin.sidebarWidth";
-
-function clampWidth(width: number): number {
-  const max = typeof window === "undefined" ? 720 : Math.max(MIN_WIDTH, window.innerWidth * 0.5);
-  return Math.round(Math.min(Math.max(width, MIN_WIDTH), max));
-}
-
-function readSavedWidth(): number {
-  try {
-    const saved = Number(window.localStorage.getItem(WIDTH_KEY));
-    return saved ? clampWidth(saved) : DEFAULT_WIDTH;
-  } catch {
-    return DEFAULT_WIDTH;
-  }
-}
-
-/** Dragging the panel this far past its narrowest hides it; the Coin button brings it back. */
-const HIDE_BELOW = MIN_WIDTH - 110;
-
-function useSidebarWidth(onHide: () => void) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const dragging = useRef(false);
-
-  // Restore the saved width after hydration (the server renders the default).
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setWidth(readSavedWidth()));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  const startDrag = (event: React.PointerEvent) => {
-    dragging.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const drag = (event: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const wanted = window.innerWidth - event.clientX;
-    if (wanted < HIDE_BELOW) {
-      dragging.current = false;
-      onHide();
-      return;
-    }
-    setWidth(clampWidth(wanted));
-  };
-  const endDrag = () => {
-    dragging.current = false;
-    try {
-      window.localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {
-      // Storage can be unavailable (private mode); the width just won't persist.
-    }
-  };
-  const nudge = (delta: number) => setWidth((current) => clampWidth(current + delta));
-
-  return { width, startDrag, drag, endDrag, nudge };
-}
+const COIN_PANEL = {
+  storageKey: "coin.sidebarWidth",
+  initial: 420,
+  min: 340,
+  max: () => window.innerWidth * 0.5,
+  edge: "left",
+  // Dragged well past its narrowest, the panel hides; the Coin button brings it back.
+  collapseBelow: 230,
+} as const;
 
 /** `?account=acc_tfsa` deep-links straight into an account. */
 function useDeepLinkedAccount(): [AccountId | null, (id: AccountId | null) => void] {
@@ -145,7 +98,7 @@ function useCoinOpen(hasMessages: boolean, mode: "live" | "demo") {
 
 /** Where the Coin panel sits for each choice (null = follow the screen size). */
 function panelClass(choice: boolean | null): string {
-  const placed = "fixed inset-0 z-40 lg:relative lg:inset-auto lg:z-auto lg:shrink-0 lg:py-3 lg:pr-3";
+  const placed = "fixed inset-0 z-40 lg:relative lg:inset-auto lg:z-auto lg:shrink-0 lg:py-3 lg:pl-3 lg:pr-3";
   if (choice === null) return `hidden lg:flex ${placed}`;
   return choice ? `flex ${placed}` : "hidden";
 }
@@ -166,28 +119,6 @@ function OpenCoinButton({ choice, lifted, onOpen }: { choice: boolean | null; li
   );
 }
 
-function ResizeHandle({ sidebar }: { sidebar: ReturnType<typeof useSidebarWidth> }) {
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize Coin"
-      tabIndex={0}
-      onPointerDown={sidebar.startDrag}
-      onPointerMove={sidebar.drag}
-      onPointerUp={sidebar.endDrag}
-      onKeyDown={(event) => {
-        if (event.key === "ArrowLeft") sidebar.nudge(24);
-        if (event.key === "ArrowRight") sidebar.nudge(-24);
-      }}
-      title="Drag to resize. Drag all the way right to hide Coin."
-      className="group absolute inset-y-6 -left-3 z-10 hidden w-3 cursor-col-resize place-items-center lg:grid"
-    >
-      <span className="h-12 w-1 rounded-full bg-border-strong opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
-    </div>
-  );
-}
-
 function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live" | "demo" }) {
   const [viewing, setViewing] = useDeepLinkedAccount();
   const [view, setView] = useState<View>("home");
@@ -198,7 +129,7 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
   const setOpenAccount = (account: AccountView | null) => setViewing(account?.id ?? null);
   const coin = useCoinChat(transport, refresh);
   const panel = useCoinOpen(coin.chat.messages.length > 0, mode);
-  const sidebar = useSidebarWidth(panel.close);
+  const sidebar = useResizable({ ...COIN_PANEL, onCollapse: panel.close });
   const type = useCallback((text: string) => setPrefill({ text, id: Math.random() }), []);
   const demo = mode === "demo";
   const openView = (next: View) => {
@@ -236,7 +167,13 @@ function ReadyShell({ transport, mode }: { transport: ChatTransport; mode: "live
         className={`${panelClass(panel.choice)} ${demo ? "max-lg:bottom-52" : ""}`}
         style={{ "--coin-width": `${sidebar.width}px` } as React.CSSProperties}
       >
-        <ResizeHandle sidebar={sidebar} />
+        {/* The grip sits in the panel's own gutter, clear of the dashboard's scrollbar. */}
+        <ResizeGrip
+          grip={sidebar.grip}
+          label="Resize Coin"
+          hint="Drag to resize. Drag all the way right to hide Coin."
+          className="inset-y-3 left-0"
+        />
         <div className="h-full w-full lg:w-(--coin-width)">
           <CoinSidebar coin={coin} viewingAccountId={viewing} onCollapse={panel.close} replayOnly={demo} prefill={prefill} />
         </div>

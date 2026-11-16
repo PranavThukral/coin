@@ -4,7 +4,6 @@
 // Each quick action hands Coin a ready-to-edit request; nothing happens until
 // the request is sent and its card is approved.
 import { useEffect, useState } from "react";
-import { PERSONA } from "../../contracts";
 import { longDate } from "../../lib/format";
 import { ActivityGlyph, BillGlyph, TrendGlyph } from "../ui/icons";
 import { SendIcon } from "../ui/icons";
@@ -42,7 +41,7 @@ export function HomeHeader({ today, onCompose }: {
     <header className="coin-rise">
       <p className="text-sm font-medium text-subtle">{longDate(today)}</p>
       <h1 className="mt-1 text-[1.75rem] font-bold leading-tight tracking-[-0.02em] sm:text-[2rem]">
-        {greeting}, {PERSONA.first_name}
+        {greeting}
       </h1>
       {onCompose && (
         <div className="mt-5 flex flex-wrap gap-2">

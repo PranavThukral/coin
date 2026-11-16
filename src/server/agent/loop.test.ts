@@ -107,7 +107,7 @@ describe("paying the credit card", () => {
   });
 
   it("the prompt names bill_card and tells the model to propose what rules will block", () => {
-    const prompt = buildSystemPrompt({ firstName: "Jordan", today: "2026-11-14", viewingAccountName: null });
+    const prompt = buildSystemPrompt({ today: "2026-11-14", viewingAccountName: null });
     expect(prompt).toContain('type "bill_payment" with bill_id "bill_card"');
     expect(prompt).toContain("propose it exactly as asked, even if you expect a limit to stop it");
     expect(prompt).toContain("Propose only when the user asks for an action.");

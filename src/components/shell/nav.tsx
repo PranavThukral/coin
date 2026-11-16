@@ -7,7 +7,8 @@ import type { AccountId, AccountView } from "../../contracts";
 import type { DashboardPayload } from "../../lib/api";
 import { money } from "../../lib/format";
 import { Mascot } from "../coin/mascot";
-import { ActivityGlyph, HomeGlyph, TrendGlyph } from "../ui/icons";
+import { ActivityGlyph, HomeGlyph, PanelGlyph, TrendGlyph } from "../ui/icons";
+import { ResizeGrip, useResizable, useStoredFlag } from "../ui/resizable";
 import { useFetched } from "../ui/use-fetched";
 
 export type View = "home" | "activity" | "investments";
@@ -74,39 +75,95 @@ function AccountLinks({ accounts, accountId, onAccount }: {
   );
 }
 
-/** Desktop: the full rail. */
+const RAIL = {
+  storageKey: "coin.navWidth",
+  initial: 256,
+  min: 208,
+  max: () => 360,
+  edge: "right",
+  // Dragged this narrow, the navigation folds down to its icons.
+  collapseBelow: 150,
+} as const;
+
+const ICON_BUTTON = "grid h-9 w-9 place-items-center rounded-coin-sm text-subtle transition-colors hover:bg-surface-soft hover:text-foreground";
+
+function ViewLinks({ view, accountId, iconsOnly, onView }: Pick<Props, "view" | "accountId" | "onView"> & { iconsOnly: boolean }) {
+  return (
+    <nav className="space-y-0.5">
+      {VIEWS.map((item) => {
+        const active = accountId === null && view === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            data-demo={`view-${item.id}`}
+            aria-current={active ? "page" : undefined}
+            aria-label={item.label}
+            title={iconsOnly ? item.label : undefined}
+            onClick={() => onView(item.id)}
+            className={`${ITEM} ${active ? ACTIVE : IDLE} ${iconsOnly ? "justify-center px-0" : ""}`}
+          >
+            <span className={active ? "text-accent-text" : "text-subtle"}>{item.glyph}</span>
+            {!iconsOnly && item.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** The navigation folded down to its icons, with a button to open it again. */
+function IconRail(props: Pick<Props, "view" | "accountId" | "onView"> & { onExpand: () => void }) {
+  return (
+    <aside className="hidden w-16 shrink-0 flex-col items-center border-r border-border bg-surface/50 px-2 py-4 lg:flex" aria-label="Navigation">
+      <Link href="/" aria-label="Coin" className="pb-3">
+        <Mascot size={26} />
+      </Link>
+      <button type="button" aria-label="Show the navigation" title="Show the navigation" onClick={props.onExpand} className={`mb-3 ${ICON_BUTTON}`}>
+        <PanelGlyph />
+      </button>
+      <div className="w-full">
+        <ViewLinks {...props} iconsOnly />
+      </div>
+    </aside>
+  );
+}
+
+/** Desktop: the rail. Drag its right edge to resize it; narrow enough, it folds down to icons. */
 export function NavRail({ view, accountId, mode, refreshKey, onView, onAccount }: Props) {
   const dashboard = useFetched<DashboardPayload>("/api/dashboard", refreshKey);
   const accounts = [...(dashboard?.accounts ?? [])].sort(byKind);
+  const [folded, setFolded] = useStoredFlag("coin.navFolded");
+  const rail = useResizable({ ...RAIL, onCollapse: () => setFolded(true) });
+
+  if (folded) return <IconRail view={view} accountId={accountId} onView={onView} onExpand={() => setFolded(false)} />;
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-surface/50 px-3 py-4 lg:flex" aria-label="Navigation">
-      <Link href="/" className="flex items-center gap-2.5 px-2.5 pb-5">
-        <Mascot size={26} />
-        <span className="text-lg font-extrabold tracking-tight">Coin</span>
-      </Link>
-      <nav className="space-y-0.5">
-        {VIEWS.map((item) => {
-          const active = accountId === null && view === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              data-demo={`view-${item.id}`}
-              aria-current={active ? "page" : undefined}
-              onClick={() => onView(item.id)}
-              className={`${ITEM} ${active ? ACTIVE : IDLE}`}
-            >
-              <span className={active ? "text-accent-text" : "text-subtle"}>{item.glyph}</span>
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
+    <aside
+      className="relative hidden shrink-0 flex-col border-r border-border bg-surface/50 px-3 py-4 lg:flex"
+      style={{ width: rail.width }}
+      aria-label="Navigation"
+    >
+      <div className="flex items-center justify-between pb-5 pl-2.5">
+        <Link href="/" className="flex items-center gap-2.5">
+          <Mascot size={26} />
+          <span className="text-lg font-extrabold tracking-tight">Coin</span>
+        </Link>
+        <button type="button" aria-label="Hide the navigation" title="Hide the navigation" onClick={() => setFolded(true)} className={ICON_BUTTON}>
+          <PanelGlyph />
+        </button>
+      </div>
+      <ViewLinks view={view} accountId={accountId} onView={onView} iconsOnly={false} />
       <AccountLinks accounts={accounts} accountId={accountId} onAccount={onAccount} />
       <div className="mt-auto space-y-3 pt-6">
         <ModeSwitch mode={mode} />
         <p className="px-1 text-[11px] font-medium leading-snug text-subtle">Completely synthetic data.</p>
       </div>
+      <ResizeGrip
+        grip={rail.grip}
+        label="Resize the navigation"
+        hint="Drag to resize. Drag all the way left to fold it down to icons."
+        className="inset-y-3 -right-2.5"
+      />
     </aside>
   );
 }
