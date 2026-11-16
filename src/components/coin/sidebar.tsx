@@ -14,10 +14,8 @@ import type { CardControls, useCoinChat } from "./use-coin-chat";
 const SUGGESTIONS = [
   "How am I doing overall?",
   "Where did my money go this month?",
-  "How much do I save each month?",
+  "Can I cover everything due before payday?",
   "How have my investments done?",
-  "How long would it take to save $10,000?",
-  "Pay my hydro bill",
 ];
 
 export const DISCLAIMER = "Completely synthetic data.";
@@ -250,18 +248,21 @@ function Composer({ disabled, prefill, onSend }: {
 
 function Suggestions({ onPick }: { onPick: (text: string) => void }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {SUGGESTIONS.map((text, index) => (
-        <button
-          key={text}
-          type="button"
-          onClick={() => onPick(text)}
-          style={stagger(index + 5)}
-          className="coin-rise rounded-full bg-accent-soft px-3.5 py-2 text-left text-[13px] font-bold text-accent-text transition-transform hover:-translate-y-0.5"
-        >
-          {text}
-        </button>
-      ))}
+    <div>
+      <p className="mb-2 text-xs font-medium text-subtle">Try asking</p>
+      <div className="flex flex-wrap gap-1.5">
+        {SUGGESTIONS.map((text, index) => (
+          <button
+            key={text}
+            type="button"
+            onClick={() => onPick(text)}
+            style={stagger(index + 5)}
+            className="coin-rise rounded-full border border-border bg-surface px-3 py-1.5 text-left text-[13px] font-medium text-muted transition-colors hover:border-border-strong hover:text-foreground"
+          >
+            {text}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

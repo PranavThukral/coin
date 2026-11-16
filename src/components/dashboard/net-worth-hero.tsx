@@ -7,7 +7,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { areaPath, plot, smoothPath, yOf, type Scale } from "../../lib/chart-path";
-import { longDate, signedMoney } from "../../lib/format";
+import { longDate, shortDate, signedMoney } from "../../lib/format";
 import {
   changeTo,
   NET_WORTH_RANGES,
@@ -235,7 +235,7 @@ export function NetWorthHero({ netWorthCents, refreshKey, children }: {
   };
 
   return (
-    <section className="coin-rise rounded-coin-lg bg-surface shadow-coin-float" aria-label="Net worth">
+    <section className="coin-rise rounded-coin-lg bg-surface shadow-coin" aria-label="Net worth">
       <div className="px-6 pt-7 sm:px-9 sm:pt-9">
         <p className="text-sm font-bold text-subtle">Net worth</p>
         <p className="mt-1 text-[2.75rem] font-extrabold leading-none tracking-[-0.035em] sm:text-6xl lg:text-7xl">
@@ -246,7 +246,14 @@ export function NetWorthHero({ netWorthCents, refreshKey, children }: {
       <div className="mt-4 px-2 sm:px-4">
         <HeroChart points={points} height={260} scrub={at} onScrub={setScrub} />
       </div>
-      <div className="px-4 pb-5 pt-2 sm:px-7">
+      {points.length > 1 && (
+        <p className="money flex justify-between px-6 text-[11px] font-medium text-subtle sm:px-9" aria-hidden="true">
+          <span>{shortDate(points[0].date)}</span>
+          <span>{shortDate(points[Math.floor(points.length / 2)].date)}</span>
+          <span>Today</span>
+        </p>
+      )}
+      <div className="px-4 pb-5 pt-3 sm:px-7">
         <RangeTabs range={range} onPick={pickRange} />
       </div>
       {children && <div className="border-t border-border px-6 py-5 sm:px-9">{children}</div>}

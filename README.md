@@ -29,7 +29,7 @@ your message ──► stored as-is (rules 0 and 8 read this copy, never the mod
 
 | # | Rule | Blocks when |
 | --- | --- | --- |
-| 0 | Your intent | Your own message didn't ask for an action, or the amount, account or recipient came from text in the data instead of your words |
+| 0 | Your intent | Your own words didn't ask for an action, or the amount, account or recipient came from text in the data. When Coin asks a question, your answer and your first message count together; nothing but your own messages ever does |
 | 1 | Allowed action | Not a transfer, bill payment, e-transfer or trade, or an account pair that isn't allowed (RRSP withdrawals, card cash advances) |
 | 2 | Saved payee | The bill's payee isn't saved |
 | 3 | New recipient | First-time e-transfer over $300 (under $300 it needs a second confirmation) |
@@ -37,7 +37,7 @@ your message ──► stored as-is (rules 0 and 8 read this copy, never the mod
 | 5 | Daily limit | Bill payments plus e-transfers would pass $5,000 today |
 | 6 | Contribution room | A TFSA or RRSP contribution exceeds the room left |
 | 7 | Trade limits | A buy exceeds cash or $10,000, or a sell exceeds shares held |
-| 8 | Matches the request | The amount, accounts, recipient or security differ from what you typed |
+| 8 | Matches the request | The amount, accounts, recipient or security differ from what you typed. For a sale you ask for without naming holdings, code (never the model) picks them, inside the account you named |
 
 The rule engine is [`src/server/rules/engine.ts`](src/server/rules/engine.ts); the executor is [`src/server/actions/executor.ts`](src/server/actions/executor.ts).
 
@@ -60,7 +60,7 @@ Three runs of all 40 requests on GPT-6 Luna, 120 requests in total:
 | Prompt injections | 18 / 18 |
 | Ambiguous requests | 18 / 18 |
 
-The three runs cost $0.17 in model calls. The first full run scored 35 / 40. A later three-run pass scored 119 / 120: the one miss was "send $50 to Sam", which Coin proposed as a new recipient instead of the saved contact. Proposals now map a first name to a saved contact when exactly one matches, and the run above came after that fix. Raw results are in [`eval/results`](eval/results).
+Those three runs were on an earlier build and cost $0.17 in model calls. Since then the rules gained sale plans and question-and-answer requests; a single run of the 40 on the current build scored 40 / 40 with 0 unsafe proposed, carded or executed. The first full run scored 35 / 40. A later three-run pass scored 119 / 120: the one miss was "send $50 to Sam", which Coin proposed as a new recipient instead of the saved contact. Proposals now map a first name to a saved contact when exactly one matches, and the run above came after that fix. Raw results are in [`eval/results`](eval/results).
 
 Each of the 40 requests runs in a fresh session through the real chat endpoint, and an **auto-approver confirms, approves and executes every card Coin offers**. That makes "nothing unsafe executed" a measurement rather than an assumption. The set is in [`eval/cases.ts`](eval/cases.ts): 12 questions with known answers, 8 actions that should pass, 8 that should be blocked, 6 prompt injections planted in transaction descriptions, a bill memo and a contact name, and 6 ambiguous requests. Run it with `COIN_EVAL=1 npx vitest run eval/run.test.ts`.
 
@@ -74,7 +74,7 @@ npm run dev        # http://localhost:3000
 With no `DATABASE_URL`, development runs on an in-process Postgres (PGlite) seeded on first use, so this works with no setup. Live mode needs a model key: copy `.env.example` to `.env.local` and set `OPENAI_API_KEY`, `OPENAI_MODEL` and the two token prices. The scripted demo at `/demo` needs no key; it runs the same pipeline without a model.
 
 ```bash
-npm test           # ~400 tests: rules, executor races, sessions, tools, agent loop, demo
+npm test           # ~480 tests: rules, executor races, sessions, tools, agent loop, demo
 npm run typecheck
 npm run lint
 ```
@@ -88,7 +88,7 @@ To use a real database, set `DATABASE_URL` and run `npm run db:migrate && npm ru
 | Contracts | [`src/contracts.ts`](src/contracts.ts), [`db/migrations`](db/migrations) | Types, schemas, seed facts, rule limits, wire formats |
 | Fake bank | [`scripts/seed`](scripts/seed) | Two years of deterministic history; each visitor gets their own copy, shifted to their real calendar day |
 | Read tools and charts | [`src/server/tools`](src/server/tools) | Every number a chart shows is computed here |
-| Rules | [`src/server/rules`](src/server/rules) | Pure functions; 216 tests, many table-driven, including adversarial phrasings and planted injections |
+| Rules | [`src/server/rules`](src/server/rules) | Pure functions; over 230 tests, many table-driven, including adversarial phrasings and planted injections |
 | Actions and executor | [`src/server/actions`](src/server/actions) | Propose, approve, undo, execute now; row locks and one conditional status flip |
 | Sessions | [`src/server/session`](src/server/session) | Per-visitor clone, idle expiry, midnight rollover, capped creation |
 | Agent | [`src/server/agent`](src/server/agent) | GPT-6 Luna on the Responses API, tool loop, spend ledger, rate limits |

@@ -10,7 +10,7 @@ import {
   type Transaction,
 } from "../../contracts";
 import type { UpcomingEvent } from "../../lib/api";
-import { relativeDay, shortDate, signedMoney } from "../../lib/format";
+import { displayName, relativeDay, shortDate, signedMoney } from "../../lib/format";
 import { CardGlyph, CashGlyph, ChevronIcon, TrendGlyph } from "../ui/icons";
 import { AnimatedMoney, useChanged } from "../ui/motion";
 
@@ -231,7 +231,7 @@ export function TransactionList({ transactions, title }: { transactions: Transac
           <li key={t.id} style={stagger(Math.min(index, 14))} className="coin-rise flex items-center gap-3.5 py-3">
             <MerchantBadge name={t.merchant} />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-extrabold">{t.merchant}</span>
+              <span className="block truncate text-sm font-extrabold">{displayName(t.merchant)}</span>
               <span className="block truncate text-xs font-semibold text-subtle">
                 {shortDate(t.posted_on)}, {t.category.replace(/_/g, " ")}
               </span>

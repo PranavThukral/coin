@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AccountView, Transaction, TxnKind } from "../../contracts";
 import { unwrap, type Wrapped } from "../../lib/api";
-import { shortDate, signedMoney } from "../../lib/format";
+import { displayName, shortDate, signedMoney } from "../../lib/format";
 import { SearchGlyph } from "../ui/icons";
 import { stagger } from "./pieces";
 
@@ -112,7 +112,7 @@ function Row({ transaction, accountName, index }: { transaction: Transaction; ac
             {transaction.merchant.trim().charAt(0).toUpperCase()}
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-bold">{transaction.merchant}</span>
+            <span className="block truncate font-bold">{displayName(transaction.merchant)}</span>
             <span className="block truncate text-xs font-medium text-subtle">{accountName}</span>
           </span>
         </span>

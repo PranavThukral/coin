@@ -9,11 +9,11 @@ type OverviewItem = OverviewPayload["items"][number];
 
 function Item({ item, index }: { item: OverviewItem; index: number }) {
   return (
-    <li className="coin-rise rounded-coin-sm bg-surface-soft px-4 py-3" style={{ "--i": index + 1 } as React.CSSProperties}>
+    <li className="coin-rise px-4 py-3" style={{ "--i": index + 1 } as React.CSSProperties}>
       <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-extrabold">{item.title}</p>
+        <p className="text-sm font-bold">{item.title}</p>
         {item.amount_cents !== null && (
-          <p className={`money shrink-0 text-sm font-extrabold ${item.amount_cents > 0 ? "text-gain" : ""}`}>
+          <p className={`money shrink-0 text-sm font-bold ${item.amount_cents > 0 ? "text-gain" : ""}`}>
             {signedMoney(item.amount_cents, true)}
           </p>
         )}
@@ -58,8 +58,8 @@ export function OverviewPanel({ accountId }: { accountId: AccountId | null }) {
 
   return (
     <div>
-      <p className="coin-rise text-xl font-extrabold tracking-tight">{overview.greeting}</p>
-      <ul className="mt-3 space-y-2">
+      <p className="coin-rise text-xs font-medium text-subtle">{overview.greeting}</p>
+      <ul className="mt-2 divide-y divide-border rounded-coin border border-border">
         {overview.items.map((item, index) => (
           <Item key={`${item.kind}-${item.title}`} item={item} index={index} />
         ))}

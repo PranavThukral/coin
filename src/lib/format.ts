@@ -21,6 +21,13 @@ export function compactMoney(cents: number): string {
 }
 
 /** "Nov 18" from "2026-11-18". */
+/** A ledger name for display: one that arrives in capitals is shown as ordinary words. Tickers keep theirs. */
+export function displayName(name: string): string {
+  const shouting = name === name.toUpperCase() && /[A-Z]{4,}/.test(name) && !name.includes(".");
+  if (!shouting) return name;
+  return name.charAt(0) + name.slice(1).toLowerCase();
+}
+
 export function shortDate(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00Z`);
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(d);

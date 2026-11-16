@@ -213,7 +213,7 @@ function Actions(props: { card: ActionCard; state: CardState; email: string; bus
     return (
       <>
         <button type="button" className={PRIMARY} disabled={busy || (confirming && !email)} onClick={primaryClick}>
-          {confirming ? "Confirm new recipient" : "Approve"}
+          {confirming ? "Confirm recipient" : "Approve"}
         </button>
         <button type="button" className={SECONDARY} disabled={busy} onClick={props.onDismiss}>
           Dismiss
