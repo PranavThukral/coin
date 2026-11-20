@@ -1,6 +1,6 @@
 /**
- * Audit of the action service (round 1). Tests that fail are findings; severity in the
- * describe name.
+ * Adversarial tests for the action service: dismissal, ledger wording and
+ * regression guards. Severity is in the describe name.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { seededTestDb, type SeededTestDb } from "../db/test-db";

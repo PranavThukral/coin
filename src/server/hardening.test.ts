@@ -1,5 +1,5 @@
 /**
- * Regression tests from the w11 codebase pass. Each one failed before its fix.
+ * Regression tests from a hardening pass. Each one failed before its fix.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GET as sessionGet } from "../app/api/session/route";
