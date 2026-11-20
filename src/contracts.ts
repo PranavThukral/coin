@@ -1,11 +1,12 @@
 /**
- * COIN — DAY-ONE CONTRACTS
+ * COIN — SHARED CONTRACTS
  * ---------------------------------------------------------------------------
- * The single file every part of Coin builds against. Bump CONTRACTS_VERSION on every change.
+ * Types, schemas, seed facts and limits that the server, the UI, the tests and
+ * the eval all agree on. Bump CONTRACTS_VERSION on every change.
  *
- * Companion files (also contracts, same rule):
+ * Companion files:
  *   db/migrations/0001_init.sql   — the database schema
- *   docs/CONTRACTS.md             — prose explanation of every decision here
+ *   docs/DESIGN.md                — the reasoning behind the main decisions here
  *
  * Sections
  *   1. Conventions (money, dates, ids)
@@ -23,7 +24,7 @@
  */
 import { z } from "zod";
 
-export const CONTRACTS_VERSION = "1.5.0"; // 1.1: live dates, card = bill payment, daily outflow. 1.2: confirmed email, message variants. 1.3: bills may be $0. 1.4: overview text never repeats its amount. 1.5: audit wording (R2, R8 trades, bill_card, tickers), ticker_weight_of_portfolio
+export const CONTRACTS_VERSION = "1.5.0"; // 1.1: live dates, card = bill payment, daily outflow. 1.2: confirmed email, message variants. 1.3: bills may be $0. 1.4: overview text never repeats its amount. 1.5: rule wording (R2, R8 trades, bill_card, tickers), ticker_weight_of_portfolio
 
 /* ========================================================================== */
 /* 1. CONVENTIONS                                                             */
@@ -200,8 +201,8 @@ export type ActionType = z.infer<typeof ActionType>;
  * proposed      card shown, waiting for Approve (and second confirmation if any)
  * blocked       a rule failed, at proposal time or at the execution re-check
  * pending_undo  approved; executes at execute_at unless undone. Approval goes
- *               straight here (the brief's separate "approved" state is folded
- *               into this one, since approving always starts the window)
+ *               straight here (there is no separate "approved" state, since
+ *               approving always starts the window)
  * executed      ledger changed
  * cancelled     undone by the user, superseded, or session expired
  */
@@ -294,7 +295,7 @@ export type Room = z.infer<typeof Room>;
  * 2026-11-15). Visitors see them shifted to their real calendar; e.g. the
  * hydro bill "2026-11-18" is always due 3 days from today.
  *
- * The seed generator (workstream W1) must produce data that matches every
+ * The seed generator must produce data that matches every
  * number below EXACTLY at SEED_ANCHOR_DATE. Everything not pinned here (daily
  * merchants, amounts, history shape) is the generator's choice, made with a
  * seeded PRNG so it is identical on every run.

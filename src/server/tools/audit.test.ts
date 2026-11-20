@@ -1,6 +1,6 @@
 /**
- * Audit of the read tools (round 1). Failing tests are findings; severity in the
- * describe name.
+ * Adversarial tests for the read tools: untrusted text, shifted dates, planted
+ * facts and cross-tool consistency. Severity is in the describe name.
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AffordabilityResult, ChartPayload, HoldingView, RecurringChange, SpendingRow } from "../../contracts";

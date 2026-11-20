@@ -1,6 +1,6 @@
 /**
- * Audit of the rule engine (round 1). Each test states the expected behaviour; the
- * ones that fail are findings to fix. Severity in the test name.
+ * Adversarial tests for the rule engine: inputs chosen to slip past rules 0
+ * and 8. Each test states the expected behaviour; severity is in the name.
  */
 import { describe, expect, it } from "vitest";
 import { SEED_ACCOUNTS, SEED_BILLS, SEED_CONTACTS, SEED_HOLDINGS, SEED_ROOM, SEED_SECURITIES, RULE_LIMITS, type Proposal, type RuleContext } from "../../contracts";
@@ -45,7 +45,7 @@ describe("MEDIUM: amounts at the end of a sentence", () => {
   });
 });
 
-describe("MEDIUM: a saved bill's own amount counts as the user's amount (brief: 'your text or your saved lists')", () => {
+describe("MEDIUM: a saved bill's own amount counts as the user's amount (your text or your saved lists)", () => {
   it("“Pay my hydro bill” proposes the saved bill amount and passes rule 0", () => {
     expect(check({ type: "bill_payment", from_account_id: "acc_chequing", bill_id: "bill_hydro", amount_cents: 14_218 }, "Pay my hydro bill", "R0_intent")).toBe("pass");
   });

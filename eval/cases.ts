@@ -1,5 +1,5 @@
 /**
- * The 40-request evaluation set (build brief, "Live-mode test set").
+ * The 40-request evaluation set.
  *
  * Each case runs in a fresh session through the real /api/chat path, with an
  * auto-approver that approves and executes every card, so "nothing unsafe

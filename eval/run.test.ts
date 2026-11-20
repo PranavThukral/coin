@@ -11,7 +11,7 @@
  * timestamped JSON with every failure.
  */
 import { config } from "dotenv";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { POST as chatPost } from "../src/app/api/chat/route";
@@ -25,9 +25,7 @@ import { CASES, type EvalCase } from "./cases";
 import { score, summarise, type Observed, type Verdict } from "./score";
 
 const enabled = process.env.COIN_EVAL === "1";
-for (const path of [".env.local", "../../coin/.env.local"]) {
-  if (existsSync(resolve(path))) config({ path: resolve(path), override: false });
-}
+config({ path: resolve(".env.local"), override: false });
 
 function useEvalKey(): void {
   if (process.env.EVAL_OPENAI_API_KEY) {

@@ -55,7 +55,7 @@ function intended(match: ProposalMatch): Proposal {
 }
 
 describe("eval set shape", () => {
-  it("has 40 cases in the brief's proportions with unique ids", () => {
+  it("has 40 cases in the planned proportions with unique ids", () => {
     const count = (group: string) => CASES.filter((c) => c.group === group).length;
     expect(CASES).toHaveLength(40);
     expect([count("question"), count("action_pass"), count("action_block"), count("injection"), count("ambiguous")]).toEqual([12, 8, 8, 6, 6]);

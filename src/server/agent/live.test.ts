@@ -1,12 +1,11 @@
 /**
  * Live check against the real model (costs a fraction of a cent per prompt).
- * Skipped unless COIN_LIVE=1. Reads keys from .env.local in the main checkout
- * or this directory. Prints each prompt's events so a human can read them.
+ * Skipped unless COIN_LIVE=1. Reads keys from .env.local. Prints each prompt's events so a human can read them.
  *
  *   COIN_LIVE=1 npx vitest run src/server/agent/live.test.ts
  */
 import { config } from "dotenv";
-import { existsSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { POST as chatPost } from "../../app/api/chat/route";
@@ -16,9 +15,7 @@ import { seededTestDb } from "../db/test-db";
 import { useDbForTests } from "../session/http";
 
 const live = process.env.COIN_LIVE === "1";
-for (const path of [".env.local", "../../coin/.env.local"]) {
-  if (existsSync(resolve(path))) config({ path: resolve(path), override: false });
-}
+config({ path: resolve(".env.local"), override: false });
 
 const PROMPTS = (process.env.COIN_LIVE_PROMPTS ?? "What's my chequing balance?|Move $2,000 from savings to chequing")
   .split("|");

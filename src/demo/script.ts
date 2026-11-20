@@ -1,5 +1,5 @@
 /**
- * The two-minute scripted demo (build brief, "Scripted demo").
+ * The two-minute scripted demo.
  *
  * Each step's Coin turn is scripted instead of generated, but it runs through
  * the real pipeline: charts are built from the visitor's own data, proposals
